@@ -1,5 +1,5 @@
-// v26 — multi-lap grace: flat 8s (works for all speeds); per-lap min: flat 5s
-const CACHE = 'jingjitimer-v26';
+// v1 — jjcs product baseline cache.
+const CACHE = 'jjcs-v1';
 
 const APP_SHELL = [
   './',

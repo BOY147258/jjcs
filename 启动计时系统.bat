@@ -7,7 +7,7 @@ cd /d %~dp0
 
 echo.
 echo ================================================
-echo   竞迹 JingJi — 精准计时 · 智能田径
+echo   jjcs 竞迹 — 训练与轻量赛事计时系统
 echo ================================================
 echo.
 
@@ -59,7 +59,7 @@ if not "%GITHUB_TOKEN%"=="" (
 (
 echo 竞迹 APP 永久入口
 echo.
-echo https://boy147258.github.io/jingjitimer/
+echo https://boy147258.github.io/jjcs/
 echo.
 echo 把此链接发给所有手机即可使用
 echo 本次会话直连地址（备用）：%URL%
@@ -69,7 +69,7 @@ echo.
 echo ================================================
 echo   系统已启动！永久入口链接：
 echo.
-echo   https://boy147258.github.io/jingjitimer/
+echo   https://boy147258.github.io/jjcs/
 echo.
 echo   把这个链接发给所有手机即可使用
 echo ================================================

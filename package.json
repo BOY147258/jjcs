@@ -5,8 +5,12 @@
   "main": "serve.js",
   "type": "module",
   "scripts": {
-    "start": "node ws-server.js",
-    "dev":   "node serve.js"
+    "start": "node serve.js",
+    "ws": "node ws-server.js",
+    "dev": "node serve.js",
+    "test": "node --test",
+    "check": "node --check serve.js && node --check ws-server.js && node --check api.js && node --test",
+    "audit:prod": "npm audit --omit=dev"
   },
   "engines": {
     "node": ">=18"

@@ -1,7 +1,7 @@
 {
-  "name": "竞迹 JingJi",
+  "name": "jjcs 竞迹",
   "short_name": "竞迹",
-  "description": "竞迹 — 精准计时 · 智能田径。支持AI发令检测、终点自动识别、慢动作回放与成绩管理。",
+  "description": "jjcs 竞迹 — 面向训练和轻量赛事的田径计时系统，支持发令检测、终点识别、视频回放与成绩管理。",
   "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",

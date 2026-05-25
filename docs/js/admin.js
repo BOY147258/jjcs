@@ -1,9 +1,11 @@
 /**
  * 竞迹 — 成绩管理后台 (localStorage 版，无需后端)
- * 成绩由计时端保存在 localStorage['jingjitimer-history'] 中
+ * 成绩由计时端保存在 localStorage['jjcs-history'] 中。
+ * 兼容读取早期原型使用的 localStorage['jingjitimer-history']。
  */
 
-const STORAGE_KEY = 'jingjitimer-history';
+const STORAGE_KEY = 'jjcs-history';
+const LEGACY_STORAGE_KEY = 'jingjitimer-history';
 
 // ── 工具函数 ─────────────────────────────────────────────
 function msToDisplay(ms) {
@@ -21,7 +23,11 @@ function esc(s) {
 
 // ── localStorage 读写 ────────────────────────────────────
 function loadHistory() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  try {
+    const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (current.length) return current;
+    return JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || '[]');
+  }
   catch { return []; }
 }
 function saveHistory(arr) {

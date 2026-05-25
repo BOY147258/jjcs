@@ -6,7 +6,7 @@ cd /d %~dp0
 
 echo.
 echo ================================================
-echo   竞迹 JingJi — 推送最新代码
+echo   jjcs 竞迹 — 推送最新代码
 echo ================================================
 echo.
 
@@ -27,7 +27,7 @@ start "" /min cmd /c "node serve.js > server.log 2>&1"
 echo.
 echo ================================================
 echo   更新完成！链接不变：
-echo   https://boy147258.github.io/jingjitimer/
+echo   https://boy147258.github.io/jjcs/
 echo ================================================
 echo.
 pause

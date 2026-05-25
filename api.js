@@ -1,4 +1,5 @@
 import { readDB, writeDB, insertRecord, updateRecord, deleteRecord, findById } from './db.js';
+import { isAuthorizedRequest, isMutatingMethod } from './lib/security.js';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function json(res, data, status = 200) {
@@ -35,6 +36,11 @@ export async function handleAPI(req, res) {
   const url = new URL(req.url, 'http://x');
   const parts = url.pathname.replace(/^\/api/, '').split('/').filter(Boolean);
   const method = req.method.toUpperCase();
+  const adminToken = process.env.ADMIN_TOKEN || '';
+
+  if (isMutatingMethod(method) && !isAuthorizedRequest(req, adminToken)) {
+    return err(res, 'unauthorized', 401);
+  }
 
   // POST /api/meets
   // GET  /api/meets
@@ -290,7 +296,7 @@ export async function handleAPI(req, res) {
 
       res.writeHead(200, {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="jingjin-results.csv"',
+        'Content-Disposition': 'attachment; filename="jjcs-results.csv"',
       });
       return res.end(csv);
     }

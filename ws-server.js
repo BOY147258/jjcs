@@ -2,8 +2,16 @@
 // 只负责 /ping（时钟同步）和 /ws（WebSocket 房间管理），静态文件由 GitHub Pages 托管
 import http from 'http';
 import { WebSocketServer } from 'ws';
+import {
+  applyCorsHeaders,
+  isValidRoomCode,
+  normalizeAllowedOrigins,
+  parsePositiveInt,
+} from './lib/security.js';
 
 const PORT = process.env.PORT || 8080;
+const ALLOWED_ORIGINS = normalizeAllowedOrigins(process.env.ALLOWED_ORIGINS || '');
+const MAX_WS_MESSAGE_BYTES = parsePositiveInt(process.env.MAX_WS_MESSAGE_BYTES, 64 * 1024);
 
 // ── WebSocket 房间管理 ──────────────────────────────────────────────────────
 const rooms = new Map(); // roomCode → [{ws, role, id}]
@@ -25,7 +33,7 @@ wss.on('connection', (ws, req) => {
   const url  = new URL(req.url, 'http://x');
   const room = url.searchParams.get('room');
   const role = url.searchParams.get('role') || 'unknown';
-  if (!room) { ws.close(1008, 'room required'); return; }
+  if (!isValidRoomCode(room)) { ws.close(1008, 'valid room required'); return; }
 
   const id = _nextId++;
   if (!rooms.has(room)) rooms.set(room, []);
@@ -36,6 +44,10 @@ wss.on('connection', (ws, req) => {
   broadcast(room, { type: 'PEER_JOINED', role, clientId: id }, id);
 
   ws.on('message', data => {
+    if (data.length > MAX_WS_MESSAGE_BYTES) {
+      ws.close(1009, 'message too large');
+      return;
+    }
     try { broadcast(room, JSON.parse(data.toString()), id); } catch {}
   });
 
@@ -55,9 +67,7 @@ wss.on('connection', (ws, req) => {
 // ── HTTP 请求处理 ──────────────────────────────────────────────────────────
 const server = http.createServer((req, res) => {
   // CORS — 允许来自 GitHub Pages 的跨域请求
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  applyCorsHeaders(req, res, ALLOWED_ORIGINS);
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
   const urlPath = new URL(req.url, 'http://x').pathname;

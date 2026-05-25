@@ -3,3 +3,6 @@ data/
 *.tmp
 .env
 certs/
+*.log
+tunnel-log.txt
+server.log

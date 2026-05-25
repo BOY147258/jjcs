@@ -6,11 +6,20 @@ import os      from 'os';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { handleAPI } from './api.js';
+import {
+  applyCorsHeaders,
+  isSafeStaticPath,
+  isValidRoomCode,
+  normalizeAllowedOrigins,
+  parsePositiveInt,
+} from './lib/security.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT      = process.env.PORT || 8080;
 const HTTPS_PORT= process.env.HTTPS_PORT || 8443;
 const DIR       = __dirname;
+const ALLOWED_ORIGINS = normalizeAllowedOrigins(process.env.ALLOWED_ORIGINS || '');
+const MAX_WS_MESSAGE_BYTES = parsePositiveInt(process.env.MAX_WS_MESSAGE_BYTES, 64 * 1024);
 
 // Try to load self-signed certs for HTTPS (local network camera access)
 let tlsOptions = null;
@@ -54,7 +63,7 @@ wss.on('connection', (ws, req) => {
   const room   = urlObj.searchParams.get('room');
   const role   = urlObj.searchParams.get('role') || 'unknown';
 
-  if (!room) { ws.close(1008, 'room required'); return; }
+  if (!isValidRoomCode(room)) { ws.close(1008, 'valid room required'); return; }
 
   const id = _nextId++;
   if (!rooms.has(room)) rooms.set(room, []);
@@ -65,6 +74,10 @@ wss.on('connection', (ws, req) => {
   broadcast(room, { type: 'PEER_JOINED', role, clientId: id }, id);
 
   ws.on('message', data => {
+    if (data.length > MAX_WS_MESSAGE_BYTES) {
+      ws.close(1009, 'message too large');
+      return;
+    }
     try { broadcast(room, JSON.parse(data.toString()), id); } catch {}
   });
 
@@ -95,12 +108,9 @@ function attachWss(server) {
 async function handleRequest(req, res) {
   const urlObj  = new URL(req.url, 'http://x');
   const urlPath = urlObj.pathname;
-  const params  = urlObj.searchParams;
 
   // CORS
-  res.setHeader('Access-Control-Allow-Origin',  '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  applyCorsHeaders(req, res, ALLOWED_ORIGINS);
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
   // ── API ─────────────────────────────────────────────────────────────────
@@ -126,8 +136,14 @@ async function handleRequest(req, res) {
   }
 
   // ── Static files ────────────────────────────────────────────────────────
-  let filePath = path.join(DIR, urlPath === '/' ? 'index.html' : urlPath);
-  if (!filePath.startsWith(DIR)) { res.writeHead(403); res.end('Forbidden'); return; }
+  let filePath;
+  try {
+    const requestPath = urlPath === '/' ? '/index.html' : decodeURIComponent(urlPath);
+    filePath = path.resolve(DIR, `.${requestPath}`);
+  } catch {
+    res.writeHead(400); res.end('Bad request'); return;
+  }
+  if (!isSafeStaticPath(DIR, filePath)) { res.writeHead(403); res.end('Forbidden'); return; }
 
   const ext  = path.extname(filePath).toLowerCase();
   const mime = MIME[ext] || 'application/octet-stream';
@@ -163,7 +179,7 @@ if (tlsOptions) {
   const httpsServer = https.createServer(tlsOptions, handleRequest);
   httpsServer.listen(HTTPS_PORT, () => {
     console.log('='.repeat(60));
-    console.log('  竞迹 JingJi — 精准计时 · 智能田径');
+    console.log('  jjcs 竞迹 — 训练与轻量赛事计时系统');
     console.log('='.repeat(60));
     console.log(`  手机访问 (HTTPS): https://${ip}:${HTTPS_PORT}`);
     console.log(`  管理后台:         https://${ip}:${HTTPS_PORT}/admin`);
@@ -190,7 +206,7 @@ if (tlsOptions) {
   const httpServer = http.createServer(handleRequest);
   httpServer.listen(PORT, () => {
     console.log('='.repeat(56));
-    console.log('  竞迹 JingJi (HTTP模式 — 摄像头不可用)');
+    console.log('  jjcs 竞迹 (HTTP模式 — 摄像头不可用)');
     console.log('='.repeat(56));
     console.log(`  移动端:   http://${ip}:${PORT}`);
     console.log(`  管理后台: http://${ip}:${PORT}/admin`);

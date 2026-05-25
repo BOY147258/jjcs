@@ -57,7 +57,7 @@ export class Sync {
   serverNow() { return performance.now() + this._offset; }
 
   // Join a room via WebSocket (initial connection)
-  // serverHost: optional override, e.g. 'jingjitimer.onrender.com'
+  // serverHost: optional override, e.g. 'jjcs.onrender.com'
   async join(room, role, serverHost) {
     this.room            = room;
     this.role            = role;

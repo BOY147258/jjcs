@@ -1889,7 +1889,7 @@ function obsExportGroup() {
 </div>
 <table><thead><tr><th>名次</th><th>道次</th><th>姓名</th><th>成绩</th></tr></thead>
 <tbody>${rows}</tbody></table>
-<div class="footer">由 竞迹 JingJi 成绩端生成 · ${new Date().toLocaleString('zh-CN')}</div>
+<div class="footer">由 jjcs 竞迹成绩端生成 · ${new Date().toLocaleString('zh-CN')}</div>
 </body></html>`;
 
   const blob  = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
@@ -1992,7 +1992,7 @@ function loadHistory() { renderHistory(getHistory()); }
 
 // ── 保存成绩到管理后台 localStorage & session history ───
 function saveGroupToHistory(race) {
-  const ADMIN_KEY = 'jingjitimer-history';
+  const ADMIN_KEY = 'jjcs-history';
   const group = {
     id:       String(race.id || Date.now()),
     date:     new Date().toISOString(),
@@ -2138,7 +2138,7 @@ function exportResults() {
   <thead><tr><th>名次</th><th>道次</th><th>姓名</th><th>成绩</th>${thSplits}</tr></thead>
   <tbody>${rows}</tbody>
 </table>
-<div class="footer">由 竞迹 JingJi 生成 · ${new Date().toLocaleString('zh-CN')}</div>
+<div class="footer">由 jjcs 竞迹生成 · ${new Date().toLocaleString('zh-CN')}</div>
 </body></html>`;
 
   const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });

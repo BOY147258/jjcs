@@ -1,4 +1,4 @@
-// Client-side wrapper for the JingJi REST API
+// Client-side wrapper for the jjcs REST API
 const BASE = '';
 
 async function _req(method, path, body) {
