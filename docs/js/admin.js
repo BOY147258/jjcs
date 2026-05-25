@@ -34,6 +34,24 @@ function saveHistory(arr) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
 }
 
+async function fetchServerHistory() {
+  try {
+    const res = await fetch('/api/groups', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getHistory() {
+  const serverHistory = await fetchServerHistory();
+  const localHistory = loadHistory();
+  if (serverHistory && (serverHistory.length || !localHistory.length)) return serverHistory;
+  return localHistory;
+}
+
 // ── Toast ────────────────────────────────────────────────
 let _toastTimer;
 function toast(msg, type = 'success') {
@@ -73,8 +91,8 @@ function showPage(page) {
 let filterRoom = '', filterDist = '', filterDate = '';
 
 // ── 成绩页 ───────────────────────────────────────────────
-function loadResults() {
-  const history = loadHistory();
+async function loadResults() {
+  const history = await getHistory();
 
   // 填充筛选下拉
   const rooms = [...new Set(history.map(g => g.roomCode).filter(Boolean))].sort();
@@ -170,11 +188,27 @@ function deleteGroup(id) {
   loadResults();
   toast('已删除', 'warn');
 }
-window.deleteGroup = deleteGroup;
+async function deleteGroupServerFirst(id) {
+  if (!confirm('确认删除这组成绩？')) return;
+  try {
+    const res = await fetch(`/api/groups/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (res.ok) {
+      await loadResults();
+      toast('已删除', 'warn');
+      return;
+    }
+  } catch {}
+  let history = loadHistory();
+  history = history.filter(g => g.id !== id);
+  saveHistory(history);
+  await loadResults();
+  toast('已删除', 'warn');
+}
+window.deleteGroup = deleteGroupServerFirst;
 
 // ── 概览页 ───────────────────────────────────────────────
-function loadOverview() {
-  const history = loadHistory();
+async function loadOverview() {
+  const history = await getHistory();
   const totalGroups   = history.length;
   const totalResults  = history.reduce((s,g) => s + (g.results||[]).length, 0);
   const totalRooms    = new Set(history.map(g=>g.roomCode).filter(Boolean)).size;
@@ -204,8 +238,8 @@ function loadOverview() {
 }
 
 // ── 导出页 ───────────────────────────────────────────────
-function loadExport() {
-  const history = loadHistory();
+async function loadExport() {
+  const history = await getHistory();
   const rooms = [...new Set(history.map(g=>g.roomCode).filter(Boolean))].sort();
   const selExp = document.getElementById('exp-room');
   if (selExp) {
@@ -254,9 +288,9 @@ document.getElementById('btn-clear-all')?.addEventListener('click', () => {
 });
 
 // ── 筛选事件 ─────────────────────────────────────────────
-document.getElementById('filter-room')?.addEventListener('change', e => { filterRoom = e.target.value; renderResults(loadHistory()); });
-document.getElementById('filter-dist')?.addEventListener('change', e => { filterDist = e.target.value; renderResults(loadHistory()); });
-document.getElementById('filter-date')?.addEventListener('change', e => { filterDate = e.target.value; renderResults(loadHistory()); });
+document.getElementById('filter-room')?.addEventListener('change', async e => { filterRoom = e.target.value; renderResults(await getHistory()); });
+document.getElementById('filter-dist')?.addEventListener('change', async e => { filterDist = e.target.value; renderResults(await getHistory()); });
+document.getElementById('filter-date')?.addEventListener('change', async e => { filterDate = e.target.value; renderResults(await getHistory()); });
 document.getElementById('btn-clear-filter')?.addEventListener('click', () => {
   filterRoom = filterDist = filterDate = '';
   loadResults();
@@ -264,12 +298,13 @@ document.getElementById('btn-clear-filter')?.addEventListener('click', () => {
 
 // ── 导出按钮 ─────────────────────────────────────────────
 document.getElementById('btn-exp-all')?.addEventListener('click', () => {
-  exportCSV(loadHistory());
+  getHistory().then(history => exportCSV(history));
   toast('已导出全部成绩');
 });
-document.getElementById('btn-exp-room')?.addEventListener('click', () => {
+document.getElementById('btn-exp-room')?.addEventListener('click', async () => {
   const room = document.getElementById('exp-room')?.value;
-  const data = room ? loadHistory().filter(g=>g.roomCode===room) : loadHistory();
+  const history = await getHistory();
+  const data = room ? history.filter(g=>g.roomCode===room) : history;
   exportCSV(data);
   toast(`已导出${room?`房间 ${room} 的`:'全部'}成绩`);
 });

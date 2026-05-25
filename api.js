@@ -1,4 +1,5 @@
 import { readDB, writeDB, insertRecord, updateRecord, deleteRecord, findById } from './db.js';
+import { buildResultGroups, parseResultGroupId } from './lib/result-groups.js';
 import { isAuthorizedRequest, isMutatingMethod } from './lib/security.js';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -246,6 +247,28 @@ export async function handleAPI(req, res) {
         totalResults:  results.length,
         eventBests,
       });
+    }
+
+    // ── admin-compatible result groups ─────────────────────────────────────
+    if (parts[0] === 'groups' && method === 'GET') {
+      return json(res, buildResultGroups({
+        meets: readDB('meets'),
+        events: readDB('events'),
+        results: readDB('results'),
+      }));
+    }
+    if (parts[0] === 'groups' && method === 'DELETE' && parts[1]) {
+      const groupId = parseResultGroupId(parts[1]);
+      if (!groupId) return err(res, 'invalid group id');
+
+      const results = readDB('results');
+      const kept = results.filter(result =>
+        Number(result.eventId) !== groupId.eventId ||
+        Number(result.round || 1) !== groupId.round ||
+        Number(result.group || 1) !== groupId.group
+      );
+      writeDB('results', kept);
+      return json(res, { ok: true, deleted: results.length - kept.length });
     }
 
     // ── export CSV ─────────────────────────────────────────────────────────
