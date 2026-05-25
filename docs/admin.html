@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>竞迹 · 成绩管理</title>
+<link rel="stylesheet" href="css/admin.css">
+<style>
+/* ── 顶部返回栏（手机端也能看到）─────────────────────── */
+.topbar-back {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  background: #12121e;
+  border-bottom: 1px solid #2a2a44;
+  padding: 12px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.topbar-back a {
+  background: rgba(255,98,0,0.15);
+  border: 1px solid rgba(255,98,0,0.4);
+  color: #ff6200;
+  text-decoration: none;
+  padding: 7px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.topbar-back .tb-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f0f2f5;
+}
+@media (max-width: 768px) {
+  .topbar-back { display: flex; }
+  .sidebar { display: none; }
+  .content { margin-left: 0 !important; padding: 16px !important; }
+}
+
+/* ── 补充样式 ── */
+.filter-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:16px; }
+.filter-bar select { background:#1a2035; border:1px solid rgba(255,255,255,.12); color:#f0f2f5; padding:6px 10px; border-radius:8px; font-size:13px; }
+.filter-bar .btn-ghost { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); color:#f0f2f5; padding:6px 14px; border-radius:8px; font-size:13px; cursor:pointer; }
+.result-count { font-size:12px; color:#6b7a99; margin-left:auto; }
+.row-gold   td:first-child { color:#ffd600; }
+.row-silver td:first-child { color:#b0bec5; }
+.row-bronze td:first-child { color:#ff8f00; }
+.time-cell { font-family:monospace; font-size:15px; font-weight:700; color:#00e676; }
+.group-sep td { background:rgba(255,255,255,.04); color:#6b7a99; font-size:11px; padding:4px 12px; letter-spacing:.5px; }
+.stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+@media(max-width:600px){ .stat-grid{grid-template-columns:repeat(2,1fr);} }
+.stat-card { background:#111827; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:16px; text-align:center; }
+.stat-val   { font-size:28px; font-weight:800; color:#ff6200; }
+.stat-label { font-size:12px; color:#6b7a99; margin-top:4px; }
+.export-panel { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+.export-card  { background:#111827; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:20px; }
+.export-card h3 { margin-bottom:12px; color:#f0f2f5; }
+.export-card select { width:100%; margin-bottom:10px; background:#1a2035; border:1px solid rgba(255,255,255,.12); color:#f0f2f5; padding:6px 8px; border-radius:8px; }
+.empty { text-align:center; color:#6b7a99; padding:24px; }
+.btn-danger { background:rgba(245,34,45,.15); border:1px solid rgba(245,34,45,.3); color:#f5222d; padding:3px 10px; border-radius:6px; font-size:12px; cursor:pointer; }
+.btn-danger:hover { background:rgba(245,34,45,.25); }
+.page-header { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+.page-header h1 { margin:0; }
+</style>
+</head>
+<body>
+
+<!-- ── 手机端顶部导航栏（桌面端隐藏，手机端显示）── -->
+<div class="topbar-back">
+  <a href="index.html">← 返回计时端</a>
+  <span class="tb-title">📊 成绩管理</span>
+</div>
+
+<nav class="sidebar">
+  <div class="brand">
+    <span class="brand-icon">⚡</span>
+    <div><div class="brand-name">竞迹</div><div class="brand-sub">成绩管理</div></div>
+  </div>
+
+  <!-- 侧栏顶部：明显的返回按钮 -->
+  <a href="index.html" style="
+    display:block; margin:12px 10px 4px;
+    background:rgba(255,98,0,0.15); border:1px solid rgba(255,98,0,0.4);
+    color:#ff6200; text-decoration:none; text-align:center;
+    padding:9px 0; border-radius:10px; font-size:13px; font-weight:700;
+    letter-spacing:0.3px; transition:background .15s;">
+    ← 返回计时端
+  </a>
+
+  <ul class="nav-list">
+    <li><a href="#" data-page="overview" class="nav-link">📊 概览</a></li>
+    <li><a href="#" data-page="results"  class="nav-link active">🏅 成绩查询</a></li>
+    <li><a href="#" data-page="export"   class="nav-link">📤 导出</a></li>
+  </ul>
+
+  <div style="padding:10px 10px 12px; border-top:1px solid #2a2a44;">
+    <button class="btn-ghost" id="btn-refresh" style="width:100%;margin-bottom:8px">🔄 刷新数据</button>
+    <button class="btn-danger" id="btn-clear-all" style="width:100%;border-radius:8px;padding:8px;font-size:12px">🗑️ 清除所有成绩</button>
+  </div>
+</nav>
+
+<main class="content">
+
+  <!-- ── 概览 ── -->
+  <section id="page-overview" class="page">
+    <h1 style="margin-bottom:20px">系统概览</h1>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-val" id="st-groups">—</div><div class="stat-label">已跑组数</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-results">—</div><div class="stat-label">成绩条数</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-rooms">—</div><div class="stat-label">房间数</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-dists">—</div><div class="stat-label">项目距离</div></div>
+    </div>
+    <h2 style="margin-bottom:12px">最近 10 组</h2>
+    <table class="data-table" id="recent-table">
+      <thead><tr><th>日期</th><th>比赛名称</th><th>距离</th><th>轮次/组</th><th>最佳成绩</th><th>运动员</th><th>房间</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- ── 成绩查询 ── -->
+  <section id="page-results" class="page active">
+    <div class="page-header">
+      <h1>成绩查询</h1>
+      <span class="result-count" id="result-count">—</span>
+    </div>
+    <div class="filter-bar">
+      <select id="filter-room"><option value="">— 全部房间 —</option></select>
+      <select id="filter-dist"><option value="">— 全部距离 —</option></select>
+      <select id="filter-date"><option value="">— 全部日期 —</option></select>
+      <button class="btn-ghost" id="btn-clear-filter">清除筛选</button>
+    </div>
+    <table class="data-table" id="results-table">
+      <thead>
+        <tr>
+          <th>名次</th><th>成绩</th><th>姓名</th><th>道次</th>
+          <th>距离</th><th>轮次/组别</th><th>房间</th><th>日期</th><th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- ── 导出 ── -->
+  <section id="page-export" class="page">
+    <h1 style="margin-bottom:20px">数据导出</h1>
+    <div class="export-panel">
+      <div class="export-card">
+        <h3>按房间导出</h3>
+        <select id="exp-room"><option value="">— 全部 —</option></select>
+        <button class="btn-primary" id="btn-exp-room">⬇️ 下载 CSV</button>
+      </div>
+      <div class="export-card">
+        <h3>全量导出</h3>
+        <p style="color:#6b7a99;font-size:13px;margin-bottom:12px">导出本设备所有历史成绩</p>
+        <button class="btn-primary" id="btn-exp-all">⬇️ 下载全量 CSV</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast hidden"></div>
+<script src="js/admin.js" type="module"></script>
+</body>
+</html>

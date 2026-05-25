@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: jjcs
+    env: node
+    plan: free
+    buildCommand: echo "no build needed"
+    startCommand: node serve.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /ping

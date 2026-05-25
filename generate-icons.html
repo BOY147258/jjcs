@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>生成图标</title>
+<style>
+  body { font-family: sans-serif; background: #111; color: #eee; padding: 32px; text-align: center; }
+  canvas { border: 1px solid #333; margin: 8px; display: none; }
+  .btn { background: #ff6200; color: #fff; border: none; padding: 12px 24px; border-radius: 8px;
+         font-size: 16px; cursor: pointer; margin: 8px; display: inline-block; text-decoration: none; }
+  #status { margin-top: 16px; color: #00e676; font-size: 14px; }
+</style>
+</head>
+<body>
+<h2>🏃 田径计时 — 图标生成器</h2>
+<p>点击按钮自动生成 PNG 图标并下载到 icons/ 目录</p>
+<button class="btn" onclick="generate()">生成并下载图标</button>
+<canvas id="c192" width="192" height="192"></canvas>
+<canvas id="c512" width="512" height="512"></canvas>
+<div id="status"></div>
+<script>
+function drawIcon(ctx, size) {
+  const s = size / 100;
+  ctx.fillStyle = '#080810';
+  roundRect(ctx, 0, 0, size, size, 22 * s);
+  ctx.fill();
+
+  // Outer ring
+  ctx.beginPath();
+  ctx.arc(50*s, 58*s, 34*s, 0, Math.PI*2);
+  ctx.strokeStyle = '#ff6200'; ctx.lineWidth = 3*s; ctx.fillStyle = '#13132a';
+  ctx.fill(); ctx.stroke();
+
+  // Inner circle
+  ctx.beginPath();
+  ctx.arc(50*s, 58*s, 26*s, 0, Math.PI*2);
+  ctx.fillStyle = '#080810'; ctx.fill();
+
+  // Tick marks
+  ctx.strokeStyle = '#7778a0'; ctx.lineWidth = 2*s;
+  [[50,29,50,34],[76,58,71,58],[50,87,50,82],[24,58,29,58]].forEach(([x1,y1,x2,y2]) => {
+    ctx.beginPath(); ctx.moveTo(x1*s,y1*s); ctx.lineTo(x2*s,y2*s);
+    ctx.lineCap='round'; ctx.stroke();
+  });
+
+  // Minute hand (orange)
+  ctx.strokeStyle = '#ff6200'; ctx.lineWidth = 3*s;
+  ctx.beginPath(); ctx.moveTo(50*s,58*s); ctx.lineTo(50*s,40*s);
+  ctx.lineCap='round'; ctx.stroke();
+
+  // Second hand (green)
+  ctx.strokeStyle = '#00e676'; ctx.lineWidth = 2.5*s;
+  ctx.beginPath(); ctx.moveTo(50*s,58*s); ctx.lineTo(64*s,65*s);
+  ctx.lineCap='round'; ctx.stroke();
+
+  // Center dot
+  ctx.beginPath(); ctx.arc(50*s,58*s,4*s,0,Math.PI*2);
+  ctx.fillStyle='#ff6200'; ctx.fill();
+
+  // Crown
+  ctx.fillStyle='#ff6200';
+  roundRect(ctx, 44*s,17*s,12*s,8*s,4*s); ctx.fill();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function generate() {
+  const sizes = [{ id:'c192', size:192, name:'icon-192.png' }, { id:'c512', size:512, name:'icon-512.png' }];
+  sizes.forEach(({id, size, name}) => {
+    const canvas = document.getElementById(id);
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,size,size);
+    drawIcon(ctx, size);
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+  document.getElementById('status').textContent =
+    '✅ 已下载 icon-192.png 和 icon-512.png，请将它们移动到 sports-timer/icons/ 目录中';
+}
+</script>
+</body>
+</html>

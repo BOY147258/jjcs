@@ -1,0 +1,17 @@
+{
+  "name": "jjcs",
+  "version": "1.0.0",
+  "description": "jjcs sports timing system",
+  "main": "serve.js",
+  "type": "module",
+  "scripts": {
+    "start": "node ws-server.js",
+    "dev":   "node serve.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.20.1"
+  }
+}
