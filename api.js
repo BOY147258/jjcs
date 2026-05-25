@@ -1,4 +1,5 @@
 import { readDB, writeDB, insertRecord, updateRecord, deleteRecord, findById } from './db.js';
+import { BACKUP_COLLECTIONS, buildBackupPayload } from './lib/backup.js';
 import { buildResultGroups, parseResultGroupId } from './lib/result-groups.js';
 import { isAuthorizedRequest, isMutatingMethod } from './lib/security.js';
 
@@ -269,6 +270,19 @@ export async function handleAPI(req, res) {
       );
       writeDB('results', kept);
       return json(res, { ok: true, deleted: results.length - kept.length });
+    }
+
+    // ── backup export ──────────────────────────────────────────────────────
+    if (parts[0] === 'backup' && method === 'GET') {
+      const collections = Object.fromEntries(
+        BACKUP_COLLECTIONS.map(name => [name, readDB(name)])
+      );
+      const payload = buildBackupPayload(collections);
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="jjcs-backup-${new Date().toISOString().slice(0, 10)}.json"`,
+      });
+      return res.end(JSON.stringify(payload, null, 2));
     }
 
     // ── export CSV ─────────────────────────────────────────────────────────

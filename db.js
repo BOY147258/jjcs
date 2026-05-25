@@ -3,12 +3,26 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, 'data');
 
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+export function getDataDir() {
+  return process.env.DATA_DIR || path.join(__dirname, 'data');
+}
+
+function ensureDataDir() {
+  const dir = getDataDir();
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function assertCollectionName(name) {
+  if (!/^[a-z][a-z0-9_-]*$/i.test(String(name))) {
+    throw new Error(`Invalid collection name: ${name}`);
+  }
+}
 
 function dbPath(name) {
-  return path.join(DATA_DIR, `${name}.json`);
+  assertCollectionName(name);
+  return path.join(ensureDataDir(), `${name}.json`);
 }
 
 export function readDB(name) {

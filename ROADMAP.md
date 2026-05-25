@@ -10,7 +10,7 @@
 
 ## Phase 2: Make Results Durable
 
-- Replace mixed `localStorage` and JSON storage with a single database-backed model.
+- Replace mixed `localStorage` and JSON storage with a single database-backed model. The current `DATA_DIR` and `/api/backup` support are an interim safety layer, not the final storage architecture.
 - Introduce meets, events, heats/groups, athletes, results, and audit logs as first-class records.
 - Make admin pages read from the server, not only from the current browser.
 - Add import/export flows for athlete rosters and official result sheets.

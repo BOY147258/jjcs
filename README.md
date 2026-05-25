@@ -48,6 +48,7 @@ Important variables:
 
 - `PORT`: HTTP port, default `8080`.
 - `HTTPS_PORT`: HTTPS port when local certificates exist, default `8443`.
+- `DATA_DIR`: server-side JSON data directory, default `./data`.
 - `ADMIN_TOKEN`: optional token protecting mutating API calls.
 - `ALLOWED_ORIGINS`: optional comma-separated CORS allowlist.
 - `MAX_WS_MESSAGE_BYTES`: inbound WebSocket payload limit.
@@ -63,6 +64,25 @@ Recommended first production shape:
 5. Back up the `data/` directory until the storage layer is replaced.
 
 The `docs/` folder exists for GitHub Pages/static hosting compatibility. The full Node server is the simpler path while the product is still evolving.
+
+## Data And Backups
+
+The current server storage is JSON based. Core records live in:
+
+- `meets.json`
+- `events.json`
+- `athletes.json`
+- `results.json`
+
+By default these files are stored in `./data`. Set `DATA_DIR` to move them elsewhere, for example to a mounted disk on a server.
+
+Download a complete JSON backup:
+
+```text
+GET /api/backup
+```
+
+The backup contains all core collections and is intended for manual safekeeping and future database migration. Do not rely on browser `localStorage` as the only copy of official results.
 
 ## Product Roadmap
 
