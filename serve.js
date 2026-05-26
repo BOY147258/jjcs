@@ -136,9 +136,6 @@ async function handleRequest(req, res) {
   // ── API ─────────────────────────────────────────────────────────────────
   if (urlPath.startsWith('/api/')) {
     if (urlPath === '/api/live-rooms') {
-      if (!isAuthorizedRequest(req, process.env.ADMIN_TOKEN || '')) {
-        return json(res, { error: 'unauthorized' }, 401);
-      }
       return json(res, {
         serverTime: Date.now(),
         rooms: buildLiveRoomSnapshot(rooms),

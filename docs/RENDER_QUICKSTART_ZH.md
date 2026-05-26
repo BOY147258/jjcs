@@ -48,7 +48,7 @@ https://你的服务.onrender.com/ping
 https://你的服务.onrender.com/admin
 ```
 
-在后台填入刚才设置的 `ADMIN_TOKEN`，进入“系统概览”，应该能看到在线房间监控区域。
+进入“系统概览”，应该能看到在线房间监控区域。删除成绩等写入操作仍需要先保存 `ADMIN_TOKEN`。
 
 ## 普通用户怎么用
 

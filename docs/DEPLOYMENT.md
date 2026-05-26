@@ -28,7 +28,7 @@ https://render.com/deploy?repo=https://github.com/BOY147258/jjcs
 5. Leave `ALLOWED_ORIGINS` empty for same-origin app/API usage, or set it to the final domain, for example `https://jjcs.example.com`.
 6. Deploy.
 7. Open `/ping` on the Render URL and confirm it returns JSON.
-8. Open `/admin`, save the admin token, and check the online-room panel.
+8. Open `/admin` and check the online-room panel. Save the admin token before performing write actions such as deleting results.
 
 The default Blueprint uses Render's free plan so a pilot can be created without payment information. Free services can spin down when idle and their filesystem is not durable. Before real events, upgrade the service plan and add a persistent disk:
 
