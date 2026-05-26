@@ -321,6 +321,16 @@ function ensureSharePanel() {
       <button type="button" class="btn btn-ghost btn-sm" id="btn-copy-finish-link">复制终点端链接</button>
       <button type="button" class="btn btn-ghost btn-sm" id="btn-copy-observer-link">复制成绩端链接</button>
     </div>
+    <div class="share-qr-row">
+      <div class="share-qr-card">
+        <img id="finish-join-qr" alt="终点端二维码">
+        <span>终点端扫码</span>
+      </div>
+      <div class="share-qr-card">
+        <img id="observer-join-qr" alt="成绩端二维码">
+        <span>成绩端扫码</span>
+      </div>
+    </div>
     <div class="share-links">
       <a id="finish-join-link" href="#" target="_blank" rel="noopener">打开终点端</a>
       <a id="observer-join-link" href="#" target="_blank" rel="noopener">打开成绩端</a>
@@ -342,7 +352,16 @@ function renderShareLinks() {
   const observerLink = $('observer-join-link');
   if (finishLink) finishLink.href = finishUrl;
   if (observerLink) observerLink.href = observerUrl;
+  const finishQr = $('finish-join-qr');
+  const observerQr = $('observer-join-qr');
+  if (finishQr) finishQr.src = qrImageUrl(finishUrl);
+  if (observerQr) observerQr.src = qrImageUrl(observerUrl);
   panel.classList.remove('hidden');
+}
+
+function qrImageUrl(value) {
+  const data = encodeURIComponent(value);
+  return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${data}`;
 }
 
 function hideShareLinks() {

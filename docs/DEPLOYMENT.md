@@ -15,6 +15,12 @@ Do not use `localhost`, LAN IPs, GitHub Pages, or temporary tunnels for real sch
 
 Render is the quickest hosted path for the current codebase because it supports Node web services, WebSocket connections, custom domains, and persistent disks.
 
+One-click entry:
+
+```text
+https://render.com/deploy?repo=https://github.com/BOY147258/jjcs
+```
+
 1. Push the latest `main` branch to GitHub.
 2. In Render, create a new Blueprint from this repository.
 3. Use the included `render.yaml`.

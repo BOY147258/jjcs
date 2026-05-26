@@ -2,6 +2,8 @@
 
 jjcs is a browser-based athletics timing prototype for training sessions and lightweight meets. It provides start-device timing, finish-device video detection, observer results, WebSocket room sync, local result history, CSV/XLS export, and PWA installation.
 
+[Deploy to Render](https://render.com/deploy?repo=https://github.com/BOY147258/jjcs)
+
 ## Current Status
 
 This repository is a productization fork of a public prototype. It can run locally and can be deployed as a small Node service, but it should be treated as an MVP rather than a certified competition timing system.

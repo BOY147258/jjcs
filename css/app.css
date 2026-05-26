@@ -1339,6 +1339,30 @@ input[type="text"]:focus { border-color: var(--accent); }
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+.share-qr-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.share-qr-card {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 700;
+}
+.share-qr-card img {
+  width: 100%;
+  max-width: 150px;
+  aspect-ratio: 1;
+  display: block;
+}
 .share-links {
   display: grid;
   grid-template-columns: 1fr 1fr;
