@@ -193,6 +193,8 @@ function isHTTPS()  { return location.protocol === 'https:' || location.hostname
 async function init() {
   loadSettings();
   buildLaneInputs();
+  ensureSharePanel();
+  applyRoleCopy();
   attachEventListeners();
   applySettingsToDOM();
   loadHistory();
@@ -207,6 +209,7 @@ async function init() {
   }
 
   DOM.roleOverlay.classList.remove('hidden');
+  applyLaunchParams();
 }
 
 
@@ -288,12 +291,136 @@ function applySettingsToDOM() {
 }
 
 // ── Role selection ─────────────────────────────────────
+function readLaunchParams() {
+  const params = new URLSearchParams(location.search);
+  const role = params.get('role');
+  const room = params.get('room');
+  const validRole = ['solo', 'start', 'finish', 'observer'].includes(role) ? role : null;
+  const cleanRoom = /^[A-Za-z0-9_-]{3,32}$/.test(room || '') ? room : '';
+  return { role: validRole, room: cleanRoom };
+}
+
+function buildJoinUrl(role, roomCode = state.roomCode) {
+  const url = new URL(location.href);
+  url.hash = '';
+  url.search = '';
+  url.searchParams.set('role', role);
+  if (roomCode) url.searchParams.set('room', roomCode);
+  return url.toString();
+}
+
+function ensureSharePanel() {
+  if ($('share-panel') || !DOM.roomCodeSetWrap) return;
+  const panel = document.createElement('div');
+  panel.id = 'share-panel';
+  panel.className = 'share-panel hidden';
+  panel.innerHTML = `
+    <div class="share-title">发给其他设备</div>
+    <div class="share-room">房间 <strong id="share-room-code">----</strong></div>
+    <div class="share-actions">
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-copy-finish-link">复制终点端链接</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-copy-observer-link">复制成绩端链接</button>
+    </div>
+    <div class="share-links">
+      <a id="finish-join-link" href="#" target="_blank" rel="noopener">打开终点端</a>
+      <a id="observer-join-link" href="#" target="_blank" rel="noopener">打开成绩端</a>
+    </div>`;
+  DOM.roomCodeSetWrap.appendChild(panel);
+}
+
+function renderShareLinks() {
+  const panel = $('share-panel');
+  if (!panel || selectedRole !== 'start') return;
+  const roomCode = DOM.roomCodeSet?.value.trim() || state.roomCode || generateRoomCode();
+  DOM.roomCodeSet.value = roomCode;
+  state.roomCode = roomCode;
+
+  const finishUrl = buildJoinUrl('finish', roomCode);
+  const observerUrl = buildJoinUrl('observer', roomCode);
+  $('share-room-code').textContent = roomCode;
+  const finishLink = $('finish-join-link');
+  const observerLink = $('observer-join-link');
+  if (finishLink) finishLink.href = finishUrl;
+  if (observerLink) observerLink.href = observerUrl;
+  panel.classList.remove('hidden');
+}
+
+function hideShareLinks() {
+  $('share-panel')?.classList.add('hidden');
+}
+
+async function copyJoinLink(role) {
+  const roomCode = DOM.roomCodeSet?.value.trim() || state.roomCode;
+  if (!roomCode) return;
+  const url = buildJoinUrl(role, roomCode);
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast(role === 'finish' ? '终点端链接已复制' : '成绩端链接已复制', 'success');
+  } catch {
+    prompt('复制这个链接发送给对应设备', url);
+  }
+}
+
+function applyRoleCopy() {
+  document.querySelector('.role-header')?.replaceChildren(document.createTextNode('竞迹'));
+  document.querySelector('.role-sub')?.replaceChildren(document.createTextNode('选择设备角色'));
+  const roleCopy = {
+    'btn-role-solo': ['手机', '单机模式', '一台设备完成简易计时'],
+    'btn-role-start': ['发', '发令端', '生成房间并控制比赛开始'],
+    'btn-role-finish': ['终', '终点端', '通过链接加入，记录冲线'],
+    'btn-role-observer': ['表', '成绩端', '通过链接加入，实时看成绩'],
+  };
+  Object.entries(roleCopy).forEach(([id, parts]) => {
+    const btn = $(id);
+    if (!btn) return;
+    btn.querySelector('.role-icon').textContent = parts[0];
+    btn.querySelector('.role-name').textContent = parts[1];
+    btn.querySelector('.role-desc').textContent = parts[2];
+  });
+  document.querySelector('#room-code-set-wrap .room-label')?.replaceChildren(
+    document.createTextNode('房间码'),
+    Object.assign(document.createElement('span'), {
+      className: 'room-label-hint',
+      textContent: '（自动生成，可作为备用口令）',
+    })
+  );
+  document.querySelector('#room-code-input-wrap .room-label')?.replaceChildren(document.createTextNode('房间码'));
+  if (DOM.roomCodeInput) DOM.roomCodeInput.placeholder = '扫码或链接会自动填写';
+  if (DOM.btnConnect) DOM.btnConnect.textContent = '连接比赛';
+  if (DOM.btnRoleConfirm) DOM.btnRoleConfirm.textContent = '进入设备';
+  if (DOM.roomStatus) DOM.roomStatus.textContent = '未连接';
+  const serverInput = $('server-url-input');
+  if (serverInput) serverInput.value = '';
+  document.querySelector('.server-url-summary')?.replaceChildren(document.createTextNode('高级：服务器地址'));
+}
+
+function applyLaunchParams() {
+  const launch = readLaunchParams();
+  if (!launch.role) return;
+
+  selectRole(launch.role);
+  if (launch.room) {
+    if (launch.role === 'start') {
+      DOM.roomCodeSet.value = launch.room;
+      renderShareLinks();
+    } else if (DOM.roomCodeInput) {
+      DOM.roomCodeInput.value = launch.room;
+    }
+  }
+
+  if ((launch.role === 'finish' || launch.role === 'observer') && launch.room) {
+    DOM.roomStatus.textContent = `已读取房间 ${launch.room}，正在连接...`;
+    setTimeout(() => connectToRoomZeroConfig({ autoConfirm: true }), 150);
+  }
+}
+
 function selectRole(role) {
   selectedRole = role;
   [DOM.btnRoleSolo, DOM.btnRoleStart, DOM.btnRoleFinish, $('btn-role-observer')]
     .forEach(b => b?.classList.remove('selected'));
 
   if (role === 'solo') {
+    hideShareLinks();
     DOM.roomPanel.classList.add('hidden');
     DOM.btnRoleConfirm.classList.remove('hidden');
     DOM.btnRoleSolo.classList.add('selected');
@@ -304,14 +431,17 @@ function selectRole(role) {
     DOM.btnRoleConfirm.classList.add('hidden');
     // Pre-fill with a suggestion; user can clear and type anything
     if (!DOM.roomCodeSet.value) DOM.roomCodeSet.value = generateRoomCode();
+    renderShareLinks();
     DOM.btnRoleStart.classList.add('selected');
   } else if (role === 'finish') {
+    hideShareLinks();
     DOM.roomPanel.classList.remove('hidden');
     DOM.roomCodeSetWrap.classList.add('hidden');
     DOM.roomCodeInputW.classList.remove('hidden');
     DOM.btnRoleConfirm.classList.add('hidden');
     DOM.btnRoleFinish.classList.add('selected');
   } else if (role === 'observer') {
+    hideShareLinks();
     DOM.roomPanel.classList.remove('hidden');
     DOM.roomCodeSetWrap.classList.add('hidden');
     DOM.roomCodeInputW.classList.remove('hidden');
@@ -371,6 +501,57 @@ async function connectToRoom() {
     if (selectedRole === 'start') {
       DOM.btnRoleConfirm.classList.remove('hidden');
     }
+  }
+}
+
+async function connectToRoomZeroConfig(options = {}) {
+  const autoConfirm = Boolean(options.autoConfirm);
+  DOM.roomStatus.textContent = '连接中...';
+  DOM.roomStatus.className = 'room-status';
+  DOM.btnConnect.disabled = true;
+
+  if (selectedRole === 'start') {
+    const code = DOM.roomCodeSet.value.trim();
+    state.roomCode = code || generateRoomCode();
+    if (!code) DOM.roomCodeSet.value = state.roomCode;
+  } else if (selectedRole === 'finish' || selectedRole === 'observer') {
+    const code = DOM.roomCodeInput?.value.trim();
+    if (!code) {
+      DOM.roomStatus.textContent = '请使用发令端链接进入，或输入同一个房间码';
+      DOM.roomStatus.className = 'room-status error';
+      DOM.btnConnect.disabled = false;
+      return;
+    }
+    state.roomCode = code;
+  }
+
+  const serverHost = ($('server-url-input')?.value.trim()) || null;
+
+  try {
+    await sync.join(state.roomCode, selectedRole, serverHost);
+    state.clientId = sync.clientId;
+    state.peerConnected = sync.peerOnline;
+    updateLatencyBadge();
+
+    const fc = sync.finishPeerCount;
+    DOM.roomStatus.textContent = fc > 0
+      ? `已连接，终点端 ${fc} 个在线`
+      : `已加入房间 ${state.roomCode}，等待设备加入`;
+    DOM.roomStatus.className = 'room-status connected';
+    renderShareLinks();
+
+    registerSyncEvents();
+    DOM.btnRoleConfirm.classList.remove('hidden');
+    showToast(`已加入房间 ${state.roomCode}`, 'success');
+    if (autoConfirm) setTimeout(confirmRole, 200);
+  } catch (e) {
+    const isWsErr = e.message?.toLowerCase().includes('websocket') || e.message?.includes('failed');
+    DOM.roomStatus.innerHTML = isWsErr
+      ? '服务器未连接，多设备同步暂不可用<br><span style="font-size:11px;color:#aaa">请检查公网服务或稍后重试。</span>'
+      : '连接失败：' + e.message;
+    DOM.roomStatus.className = 'room-status warn';
+    DOM.btnConnect.disabled = false;
+    if (selectedRole === 'start') DOM.btnRoleConfirm.classList.remove('hidden');
   }
 }
 
@@ -2201,13 +2382,17 @@ function attachEventListeners() {
   DOM.btnRoleStart.addEventListener('click',  () => selectRole('start'));
   DOM.btnRoleFinish.addEventListener('click', () => selectRole('finish'));
   $('btn-role-observer')?.addEventListener('click', () => selectRole('observer'));
-  DOM.btnConnect.addEventListener('click',    () => connectToRoom());
+  DOM.btnConnect.addEventListener('click',    () => connectToRoomZeroConfig());
   DOM.btnRoleConfirm.addEventListener('click',() => confirmRole());
 
   // Random room code suggestion
   DOM.btnRoomSuggest?.addEventListener('click', () => {
     DOM.roomCodeSet.value = generateRoomCode();
+    renderShareLinks();
   });
+  DOM.roomCodeSet?.addEventListener('input', renderShareLinks);
+  $('btn-copy-finish-link')?.addEventListener('click', () => copyJoinLink('finish'));
+  $('btn-copy-observer-link')?.addEventListener('click', () => copyJoinLink('observer'));
 
   // Permission overlay (fallback if auto-request needs retry)
   $('btn-grant-all')?.addEventListener('click', () => requestPermissions());

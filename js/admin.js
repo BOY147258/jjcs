@@ -1,37 +1,58 @@
-/**
- * 竞迹 — 成绩管理后台 (localStorage 版，无需后端)
- * 成绩由计时端保存在 localStorage['jjcs-history'] 中。
- * 兼容读取早期原型使用的 localStorage['jingjitimer-history']。
- */
+import { getAdminHeaders, getStoredAdminToken, setStoredAdminToken } from './admin-auth.js';
 
 const STORAGE_KEY = 'jjcs-history';
 const LEGACY_STORAGE_KEY = 'jingjitimer-history';
 
-// ── 工具函数 ─────────────────────────────────────────────
+const pages = {};
+document.querySelectorAll('.page').forEach(page => {
+  pages[page.id.replace('page-', '')] = page;
+});
+
+let currentPage = 'results';
+let filterRoom = '';
+let filterDist = '';
+let filterDate = '';
+let toastTimer;
+
 function msToDisplay(ms) {
-  if (ms == null || ms < 0) return '—';
-  const m  = Math.floor(ms / 60000);
-  const s  = Math.floor((ms % 60000) / 1000);
+  if (ms == null || ms < 0) return '-';
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
   const cs = Math.floor((ms % 1000) / 10);
   return m > 0
-    ? `${m}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`
-    : `${s}.${String(cs).padStart(2,'0')}`;
-}
-function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    ? `${m}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`
+    : `${s}.${String(cs).padStart(2, '0')}`;
 }
 
-// ── localStorage 读写 ────────────────────────────────────
-function loadHistory() {
+function esc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function toast(message, type = 'success') {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = message;
+  el.className = `toast ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2800);
+}
+
+function loadLocalHistory() {
   try {
     const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     if (current.length) return current;
     return JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || '[]');
+  } catch {
+    return [];
   }
-  catch { return []; }
 }
-function saveHistory(arr) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+
+function saveLocalHistory(history) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
 }
 
 async function fetchServerHistory() {
@@ -47,78 +68,62 @@ async function fetchServerHistory() {
 
 async function getHistory() {
   const serverHistory = await fetchServerHistory();
-  const localHistory = loadHistory();
+  const localHistory = loadLocalHistory();
   if (serverHistory && (serverHistory.length || !localHistory.length)) return serverHistory;
   return localHistory;
 }
 
-// ── Toast ────────────────────────────────────────────────
-let _toastTimer;
-function toast(msg, type = 'success') {
-  const el = document.getElementById('toast');
-  if (!el) return;
-  el.textContent = msg;
-  el.className = `toast ${type}`;
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => el.classList.add('hidden'), 2800);
+function renderAdminTokenState() {
+  const input = document.getElementById('admin-token-input');
+  const status = document.getElementById('admin-token-status');
+  const token = getStoredAdminToken();
+  if (input && !input.value) input.value = token;
+  if (status) status.textContent = token ? '已保存到本机浏览器' : '未设置';
 }
 
-// ── 导航 ─────────────────────────────────────────────────
-const pages = {};
-document.querySelectorAll('.page').forEach(p => {
-  pages[p.id.replace('page-','')] = p;
-});
-let currentPage = 'results';
-
-document.querySelectorAll('.nav-link').forEach(a => {
-  a.addEventListener('click', e => {
-    e.preventDefault();
-    showPage(a.dataset.page);
-  });
-});
 function showPage(page) {
   currentPage = page;
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
-  const el = document.getElementById(`page-${page}`);
-  if (el) el.classList.add('active');
-  const link = document.querySelector(`.nav-link[data-page="${page}"]`);
-  if (link) link.classList.add('active');
+  document.querySelectorAll('.page').forEach(item => item.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+  document.getElementById(`page-${page}`)?.classList.add('active');
+  document.querySelector(`.nav-link[data-page="${page}"]`)?.classList.add('active');
   loaders[page]?.();
 }
 
-// ── 筛选状态 ─────────────────────────────────────────────
-let filterRoom = '', filterDist = '', filterDate = '';
+function filteredGroups(history) {
+  return history.filter(group => {
+    if (filterRoom && group.roomCode !== filterRoom) return false;
+    if (filterDist && String(group.distance) !== String(filterDist)) return false;
+    if (filterDate && !(group.date || '').startsWith(filterDate)) return false;
+    return true;
+  });
+}
 
-// ── 成绩页 ───────────────────────────────────────────────
 async function loadResults() {
   const history = await getHistory();
+  const rooms = [...new Set(history.map(group => group.roomCode).filter(Boolean))].sort();
+  const distances = [...new Set(history.map(group => group.distance).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
+  const dates = [...new Set(history.map(group => (group.date || '').slice(0, 10)).filter(Boolean))].sort().reverse();
 
-  // 填充筛选下拉
-  const rooms = [...new Set(history.map(g => g.roomCode).filter(Boolean))].sort();
-  const dists = [...new Set(history.map(g => g.distance).filter(Boolean))].sort((a,b)=>a-b);
-  const dates = [...new Set(history.map(g => (g.date||'').slice(0,10)).filter(Boolean))].sort().reverse();
+  const roomSelect = document.getElementById('filter-room');
+  const distSelect = document.getElementById('filter-dist');
+  const dateSelect = document.getElementById('filter-date');
+  const previous = {
+    room: roomSelect?.value || filterRoom,
+    dist: distSelect?.value || filterDist,
+    date: dateSelect?.value || filterDate,
+  };
 
-  const selRoom = document.getElementById('filter-room');
-  const selDist = document.getElementById('filter-dist');
-  const selDate = document.getElementById('filter-date');
+  if (roomSelect) roomSelect.innerHTML = '<option value="">全部房间</option>' + rooms.map(room => `<option value="${esc(room)}">${esc(room)}</option>`).join('');
+  if (distSelect) distSelect.innerHTML = '<option value="">全部距离</option>' + distances.map(distance => `<option value="${esc(distance)}">${esc(distance)} m</option>`).join('');
+  if (dateSelect) dateSelect.innerHTML = '<option value="">全部日期</option>' + dates.map(date => `<option value="${esc(date)}">${esc(date)}</option>`).join('');
 
-  const prev = { room: selRoom.value, dist: selDist.value, date: selDate.value };
-
-  selRoom.innerHTML = '<option value="">— 全部房间 —</option>' +
-    rooms.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('');
-  selDist.innerHTML = '<option value="">— 全部距离 —</option>' +
-    dists.map(d => `<option value="${d}">${d} m</option>`).join('');
-  selDate.innerHTML = '<option value="">— 全部日期 —</option>' +
-    dates.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
-
-  selRoom.value = prev.room;
-  selDist.value = prev.dist;
-  selDate.value = prev.date;
-
-  filterRoom = selRoom.value;
-  filterDist = selDist.value;
-  filterDate = selDate.value;
+  if (roomSelect) roomSelect.value = previous.room;
+  if (distSelect) distSelect.value = previous.dist;
+  if (dateSelect) dateSelect.value = previous.date;
+  filterRoom = roomSelect?.value || '';
+  filterDist = distSelect?.value || '';
+  filterDate = dateSelect?.value || '';
 
   renderResults(history);
 }
@@ -127,200 +132,289 @@ function renderResults(history) {
   const tbody = document.querySelector('#results-table tbody');
   if (!tbody) return;
 
-  // 应用筛选
-  let groups = history.filter(g => {
-    if (filterRoom && g.roomCode !== filterRoom) return false;
-    if (filterDist && String(g.distance) !== String(filterDist)) return false;
-    if (filterDate && !(g.date||'').startsWith(filterDate)) return false;
-    return true;
-  });
-
+  const groups = filteredGroups(history).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
   if (!groups.length) {
     tbody.innerHTML = '<tr><td colspan="9" class="empty">暂无成绩记录</td></tr>';
     document.getElementById('result-count').textContent = '0 条成绩';
     return;
   }
 
-  // 按日期倒序、再按轮次/组别
-  groups.sort((a,b) => (b.date||'') > (a.date||'') ? 1 : -1);
-
-  const medals = ['🥇','🥈','🥉'];
+  const medals = ['🥇', '🥈', '🥉'];
   const rows = [];
   let totalCount = 0;
 
-  groups.forEach(g => {
-    const sorted = [...(g.results||[])].sort((a,b) => {
+  groups.forEach(group => {
+    const sorted = [...(group.results || [])].sort((a, b) => {
       if (a.isDNF && !b.isDNF) return 1;
       if (!a.isDNF && b.isDNF) return -1;
-      return (a.raceTime||Infinity) - (b.raceTime||Infinity);
+      return (a.raceTime ?? Infinity) - (b.raceTime ?? Infinity);
     });
 
-    sorted.forEach((r, idx) => {
+    sorted.forEach((result, index) => {
       totalCount++;
-      const rank = r.isDNF ? 'DNF' : (medals[idx] || `${idx+1}`);
-      rows.push(`<tr class="${idx===0?'row-gold':idx===1?'row-silver':idx===2?'row-bronze':''}">
+      const rank = result.isDNF ? 'DNF' : (medals[index] || String(index + 1));
+      rows.push(`<tr class="${index === 0 ? 'row-gold' : index === 1 ? 'row-silver' : index === 2 ? 'row-bronze' : ''}">
         <td>${rank}</td>
-        <td class="time-cell">${r.isDNF ? 'DNF' : msToDisplay(r.raceTime)}</td>
-        <td>${esc(r.name||`${r.laneIdx!=null?r.laneIdx+1:'?'}道`)}</td>
-        <td>${r.laneIdx!=null?r.laneIdx+1:'—'}道</td>
-        <td>${esc(g.distance)}m${g.laps>1?` × ${g.laps}圈`:''}</td>
-        <td>第${g.round||1}轮 第${g.group||1}组</td>
-        <td>${esc(g.roomCode||'—')}</td>
-        <td>${esc((g.date||'').slice(0,10))}</td>
-        <td><button class="btn-danger btn-sm" onclick="deleteGroup('${g.id}')">删除</button></td>
+        <td class="time-cell">${result.isDNF ? 'DNF' : msToDisplay(result.raceTime)}</td>
+        <td>${esc(result.name || `${result.laneIdx != null ? result.laneIdx + 1 : '?'}道`)}</td>
+        <td>${result.laneIdx != null ? result.laneIdx + 1 : '-'}道</td>
+        <td>${esc(group.distance)}m${group.laps > 1 ? ` x ${group.laps}圈` : ''}</td>
+        <td>第${group.round || 1}轮 第${group.group || 1}组</td>
+        <td>${esc(group.roomCode || '-')}</td>
+        <td>${esc((group.date || '').slice(0, 10))}</td>
+        <td><button class="btn-danger btn-sm" onclick="deleteGroup('${esc(group.id)}')">删除</button></td>
       </tr>`);
     });
 
-    // 组间隔行
-    rows.push(`<tr class="group-sep"><td colspan="9">${esc(g.raceName||'比赛')} · 第${g.round||1}轮第${g.group||1}组 · ${esc(g.distance)}m · 房间 ${esc(g.roomCode||'—')} · ${esc((g.date||'').slice(0,10))}</td></tr>`);
+    rows.push(`<tr class="group-sep"><td colspan="9">${esc(group.raceName || '比赛')} · 第${group.round || 1}轮第${group.group || 1}组 · ${esc(group.distance)}m · 房间 ${esc(group.roomCode || '-')} · ${esc((group.date || '').slice(0, 10))}</td></tr>`);
   });
 
   tbody.innerHTML = rows.join('');
   document.getElementById('result-count').textContent = `${totalCount} 条成绩`;
 }
 
-// ── 删除一组 ─────────────────────────────────────────────
-function deleteGroup(id) {
-  if (!confirm('确认删除这组成绩？')) return;
-  let history = loadHistory();
-  history = history.filter(g => g.id !== id);
-  saveHistory(history);
-  loadResults();
-  toast('已删除', 'warn');
-}
 async function deleteGroupServerFirst(id) {
   if (!confirm('确认删除这组成绩？')) return;
   try {
-    const res = await fetch(`/api/groups/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const res = await fetch(`/api/groups/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: getAdminHeaders(),
+    });
     if (res.ok) {
       await loadResults();
       toast('已删除', 'warn');
       return;
     }
   } catch {}
-  let history = loadHistory();
-  history = history.filter(g => g.id !== id);
-  saveHistory(history);
+
+  const history = loadLocalHistory().filter(group => group.id !== id);
+  saveLocalHistory(history);
   await loadResults();
-  toast('已删除', 'warn');
+  toast('已删除本机记录', 'warn');
 }
+
 window.deleteGroup = deleteGroupServerFirst;
 
-// ── 概览页 ───────────────────────────────────────────────
+function ensureLiveRoomsPanel() {
+  if (document.getElementById('live-rooms-panel')) return;
+  const overview = document.getElementById('page-overview');
+  const recent = document.getElementById('recent-table');
+  if (!overview || !recent) return;
+  const panel = document.createElement('section');
+  panel.id = 'live-rooms-panel';
+  panel.className = 'live-rooms-panel';
+  panel.innerHTML = `
+    <div class="page-header">
+      <h2>当前在线房间</h2>
+      <span class="result-count" id="live-room-count">0</span>
+    </div>
+    <div id="live-rooms-list" class="live-rooms-list">
+      <div class="empty">暂无在线设备</div>
+    </div>`;
+  overview.insertBefore(panel, recent);
+}
+
+async function fetchLiveRooms() {
+  try {
+    const res = await fetch('/api/live-rooms', {
+      cache: 'no-store',
+      headers: getAdminHeaders(),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+function roleLabel(role) {
+  return {
+    start: '发令端',
+    finish: '终点端',
+    observer: '成绩端',
+    solo: '单机',
+    unknown: '未知',
+  }[role] || role;
+}
+
+function relativeSeconds(ms) {
+  return `${Math.max(0, Math.round((ms || 0) / 1000))} 秒`;
+}
+
+function renderLiveRooms(payload) {
+  ensureLiveRoomsPanel();
+  const list = document.getElementById('live-rooms-list');
+  const count = document.getElementById('live-room-count');
+  const rooms = payload?.rooms || [];
+  if (count) count.textContent = `${rooms.length} 个房间`;
+  if (!list) return;
+  if (!rooms.length) {
+    list.innerHTML = '<div class="empty">暂无在线设备</div>';
+    return;
+  }
+
+  list.innerHTML = rooms.map(room => `
+    <div class="live-room-card">
+      <div class="live-room-head">
+        <strong>房间 ${esc(room.roomCode)}</strong>
+        <span>${room.clientCount} 台设备</span>
+      </div>
+      <div class="live-role-row">
+        <span>发令 ${room.roleCounts.start || 0}</span>
+        <span>终点 ${room.roleCounts.finish || 0}</span>
+        <span>成绩 ${room.roleCounts.observer || 0}</span>
+      </div>
+      <div class="live-client-list">
+        ${room.clients.map(client => `
+          <div class="live-client">
+            <b>${roleLabel(client.role)}</b>
+            <span>#${client.id}</span>
+            <span>在线 ${relativeSeconds(client.onlineMs)}</span>
+            <span>空闲 ${relativeSeconds(client.idleMs)}</span>
+            <span>消息 ${client.messages}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
 async function loadOverview() {
   const history = await getHistory();
-  const totalGroups   = history.length;
-  const totalResults  = history.reduce((s,g) => s + (g.results||[]).length, 0);
-  const totalRooms    = new Set(history.map(g=>g.roomCode).filter(Boolean)).size;
-  const totalDists    = new Set(history.map(g=>g.distance).filter(Boolean)).size;
+  const liveRooms = await fetchLiveRooms();
+  const totalGroups = history.length;
+  const totalResults = history.reduce((sum, group) => sum + (group.results || []).length, 0);
+  const totalRooms = liveRooms?.rooms?.length ?? new Set(history.map(group => group.roomCode).filter(Boolean)).size;
+  const totalDists = new Set(history.map(group => group.distance).filter(Boolean)).size;
 
-  document.getElementById('st-groups').textContent   = totalGroups;
-  document.getElementById('st-results').textContent  = totalResults;
-  document.getElementById('st-rooms').textContent    = totalRooms;
-  document.getElementById('st-dists').textContent    = totalDists;
+  document.getElementById('st-groups').textContent = totalGroups;
+  document.getElementById('st-results').textContent = totalResults;
+  document.getElementById('st-rooms').textContent = totalRooms;
+  document.getElementById('st-dists').textContent = totalDists;
+  renderLiveRooms(liveRooms);
 
-  // 最近10组
   const tbody = document.querySelector('#recent-table tbody');
   if (!tbody) return;
-  const recent = [...history].sort((a,b)=>(b.date||'')>(a.date||'')?1:-1).slice(0,10);
-  tbody.innerHTML = recent.map(g => {
-    const best = (g.results||[]).filter(r=>!r.isDNF).sort((a,b)=>a.raceTime-b.raceTime)[0];
+  const recent = [...history].sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 10);
+  tbody.innerHTML = recent.map(group => {
+    const best = (group.results || []).filter(result => !result.isDNF).sort((a, b) => a.raceTime - b.raceTime)[0];
     return `<tr>
-      <td>${esc((g.date||'').slice(0,10))}</td>
-      <td>${esc(g.raceName||'比赛')}</td>
-      <td>${esc(g.distance)}m</td>
-      <td>第${g.round||1}轮 第${g.group||1}组</td>
-      <td class="time-cell">${best ? msToDisplay(best.raceTime) : '—'}</td>
-      <td>${esc(best?.name||'—')}</td>
-      <td>${esc(g.roomCode||'—')}</td>
+      <td>${esc((group.date || '').slice(0, 10))}</td>
+      <td>${esc(group.raceName || '比赛')}</td>
+      <td>${esc(group.distance)}m</td>
+      <td>第${group.round || 1}轮 第${group.group || 1}组</td>
+      <td class="time-cell">${best ? msToDisplay(best.raceTime) : '-'}</td>
+      <td>${esc(best?.name || '-')}</td>
+      <td>${esc(group.roomCode || '-')}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="7" class="empty">暂无数据</td></tr>';
 }
 
-// ── 导出页 ───────────────────────────────────────────────
 async function loadExport() {
   const history = await getHistory();
-  const rooms = [...new Set(history.map(g=>g.roomCode).filter(Boolean))].sort();
-  const selExp = document.getElementById('exp-room');
-  if (selExp) {
-    selExp.innerHTML = '<option value="">— 全部 —</option>' +
-      rooms.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
+  const rooms = [...new Set(history.map(group => group.roomCode).filter(Boolean))].sort();
+  const select = document.getElementById('exp-room');
+  if (select) {
+    select.innerHTML = '<option value="">全部</option>' + rooms.map(room => `<option value="${esc(room)}">${esc(room)}</option>`).join('');
   }
 }
 
 function exportCSV(groups) {
-  const headers = ['日期','房间','比赛名称','距离','轮次','组别','排名','姓名','道次','成绩(秒)','成绩','是否DNF'];
+  const headers = ['日期', '房间', '比赛名称', '距离', '轮次', '组别', '排名', '姓名', '道次', '成绩(秒)', '成绩', '是否DNF'];
   const rows = [];
-  groups.forEach(g => {
-    const sorted = [...(g.results||[])].sort((a,b)=>(a.raceTime||Infinity)-(b.raceTime||Infinity));
-    sorted.forEach((r,i) => {
+
+  groups.forEach(group => {
+    const sorted = [...(group.results || [])].sort((a, b) => (a.raceTime ?? Infinity) - (b.raceTime ?? Infinity));
+    sorted.forEach((result, index) => {
       rows.push([
-        (g.date||'').slice(0,10),
-        g.roomCode||'',
-        g.raceName||'比赛',
-        g.distance,
-        g.round||1,
-        g.group||1,
-        r.isDNF ? 'DNF' : i+1,
-        r.name||`${r.laneIdx!=null?r.laneIdx+1:'?'}道`,
-        r.laneIdx!=null?r.laneIdx+1:'',
-        r.isDNF ? '' : ((r.raceTime||0)/1000).toFixed(2),
-        r.isDNF ? 'DNF' : msToDisplay(r.raceTime),
-        r.isDNF ? '是' : '否',
-      ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+        (group.date || '').slice(0, 10),
+        group.roomCode || '',
+        group.raceName || '比赛',
+        group.distance,
+        group.round || 1,
+        group.group || 1,
+        result.isDNF ? 'DNF' : index + 1,
+        result.name || `${result.laneIdx != null ? result.laneIdx + 1 : '?'}道`,
+        result.laneIdx != null ? result.laneIdx + 1 : '',
+        result.isDNF ? '' : ((result.raceTime || 0) / 1000).toFixed(2),
+        result.isDNF ? 'DNF' : msToDisplay(result.raceTime),
+        result.isDNF ? '是' : '否',
+      ].map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
     });
   });
 
-  const csv = '﻿' + [headers.join(','), ...rows].join('\n');
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a'); a.href = url;
-  a.download = `竞迹成绩_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click(); URL.revokeObjectURL(url);
+  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `jjcs成绩_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
-// ── 清除所有 ──────────────────────────────────────────────
-document.getElementById('btn-clear-all')?.addEventListener('click', () => {
-  if (!confirm('确认清除所有历史成绩？此操作不可撤销')) return;
-  saveHistory([]);
-  loadResults();
-  toast('已清除所有成绩', 'warn');
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', event => {
+    event.preventDefault();
+    showPage(link.dataset.page);
+  });
 });
 
-// ── 筛选事件 ─────────────────────────────────────────────
-document.getElementById('filter-room')?.addEventListener('change', async e => { filterRoom = e.target.value; renderResults(await getHistory()); });
-document.getElementById('filter-dist')?.addEventListener('change', async e => { filterDist = e.target.value; renderResults(await getHistory()); });
-document.getElementById('filter-date')?.addEventListener('change', async e => { filterDate = e.target.value; renderResults(await getHistory()); });
+document.getElementById('filter-room')?.addEventListener('change', async event => {
+  filterRoom = event.target.value;
+  renderResults(await getHistory());
+});
+document.getElementById('filter-dist')?.addEventListener('change', async event => {
+  filterDist = event.target.value;
+  renderResults(await getHistory());
+});
+document.getElementById('filter-date')?.addEventListener('change', async event => {
+  filterDate = event.target.value;
+  renderResults(await getHistory());
+});
 document.getElementById('btn-clear-filter')?.addEventListener('click', () => {
   filterRoom = filterDist = filterDate = '';
   loadResults();
 });
-
-// ── 导出按钮 ─────────────────────────────────────────────
-document.getElementById('btn-exp-all')?.addEventListener('click', () => {
-  getHistory().then(history => exportCSV(history));
+document.getElementById('btn-clear-all')?.addEventListener('click', () => {
+  if (!confirm('确认清除本机历史成绩？服务端成绩请逐组删除。')) return;
+  saveLocalHistory([]);
+  loadResults();
+  toast('已清除本机历史成绩', 'warn');
+});
+document.getElementById('btn-exp-all')?.addEventListener('click', async () => {
+  exportCSV(await getHistory());
   toast('已导出全部成绩');
 });
 document.getElementById('btn-exp-room')?.addEventListener('click', async () => {
   const room = document.getElementById('exp-room')?.value;
   const history = await getHistory();
-  const data = room ? history.filter(g=>g.roomCode===room) : history;
-  exportCSV(data);
-  toast(`已导出${room?`房间 ${room} 的`:'全部'}成绩`);
+  exportCSV(room ? history.filter(group => group.roomCode === room) : history);
+  toast(room ? `已导出房间 ${room} 的成绩` : '已导出全部成绩');
 });
-
-// ── 刷新按钮 ─────────────────────────────────────────────
 document.getElementById('btn-refresh')?.addEventListener('click', () => {
   loaders[currentPage]?.();
   toast('已刷新');
 });
+document.getElementById('btn-save-admin-token')?.addEventListener('click', () => {
+  const input = document.getElementById('admin-token-input');
+  setStoredAdminToken(input?.value || '');
+  renderAdminTokenState();
+  toast('管理员令牌已保存');
+});
+document.getElementById('btn-clear-admin-token')?.addEventListener('click', () => {
+  const input = document.getElementById('admin-token-input');
+  if (input) input.value = '';
+  setStoredAdminToken('');
+  renderAdminTokenState();
+  toast('管理员令牌已清除', 'warn');
+});
 
-// ── page loaders map ─────────────────────────────────────
 const loaders = {
   overview: loadOverview,
-  results:  loadResults,
-  export:   loadExport,
+  results: loadResults,
+  export: loadExport,
 };
 
-// ── 初始化 ───────────────────────────────────────────────
+renderAdminTokenState();
 showPage('results');

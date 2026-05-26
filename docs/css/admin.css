@@ -304,3 +304,62 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   padding: 40px;
   font-size: 14px;
 }
+
+.live-rooms-panel {
+  margin: 24px 0;
+}
+.live-rooms-list {
+  display: grid;
+  gap: 12px;
+}
+.live-room-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.live-room-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.live-room-head strong {
+  color: var(--accent);
+  font-size: 16px;
+}
+.live-room-head span,
+.live-role-row span,
+.live-client span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.live-role-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.live-role-row span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+.live-client-list {
+  display: grid;
+  gap: 6px;
+}
+.live-client {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 8px;
+  background: var(--surface2);
+  border-radius: 8px;
+}
+.live-client b {
+  color: var(--text);
+  font-size: 13px;
+}

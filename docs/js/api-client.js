@@ -1,9 +1,11 @@
+import { getAdminHeaders } from './admin-auth.js';
+
 // Client-side wrapper for the jjcs REST API
 const BASE = '';
 
 async function _req(method, path, body) {
   try {
-    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    const opts = { method, headers: { 'Content-Type': 'application/json', ...getAdminHeaders() } };
     if (body) opts.body = JSON.stringify(body);
     const r = await fetch(BASE + path, opts);
     if (!r.ok) return null;

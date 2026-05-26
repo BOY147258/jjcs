@@ -65,6 +65,14 @@ Recommended first production shape:
 
 The `docs/` folder exists for GitHub Pages/static hosting compatibility. The full Node server is the simpler path while the product is still evolving.
 
+## Public Use Flow
+
+For real schools and phones on different networks, do not rely on `localhost`, LAN IPs, or temporary tunnels. Deploy the Node service to a fixed HTTPS domain that supports WebSocket upgrades.
+
+Normal users should only open the public app URL. The start device creates a room and copies the finish/results links. Those links include `role` and `room` query parameters, so finish and results devices can join without entering a server address or admin token.
+
+Admins use `/admin`. When `ADMIN_TOKEN` is set, save the token in the admin token field to view protected operational data and perform write actions.
+
 ## Data And Backups
 
 The current server storage is JSON based. Core records live in:

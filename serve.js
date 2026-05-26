@@ -6,8 +6,10 @@ import os      from 'os';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { handleAPI } from './api.js';
+import { buildLiveRoomSnapshot } from './lib/live-rooms.js';
 import {
   applyCorsHeaders,
+  isAuthorizedRequest,
   isSafeStaticPath,
   isValidRoomCode,
   normalizeAllowedOrigins,
@@ -56,6 +58,11 @@ function broadcast(roomCode, event, excludeId = null) {
   }
 }
 
+function json(res, data, status = 200) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify(data));
+}
+
 const wss = new WebSocketServer({ noServer: true });
 
 wss.on('connection', (ws, req) => {
@@ -66,14 +73,27 @@ wss.on('connection', (ws, req) => {
   if (!isValidRoomCode(room)) { ws.close(1008, 'valid room required'); return; }
 
   const id = _nextId++;
+  const joinedAt = Date.now();
   if (!rooms.has(room)) rooms.set(room, []);
-  rooms.get(room).push({ ws, role, id });
+  const client = {
+    ws,
+    role,
+    id,
+    joinedAt,
+    lastSeenAt: joinedAt,
+    messages: 0,
+    remoteAddress: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '',
+    userAgent: req.headers['user-agent'] || '',
+  };
+  rooms.get(room).push(client);
 
   const peers = rooms.get(room).filter(c => c.id !== id).map(c => c.role);
   ws.send(JSON.stringify({ type: 'JOINED', clientId: id, role, room, peers }));
   broadcast(room, { type: 'PEER_JOINED', role, clientId: id }, id);
 
   ws.on('message', data => {
+    client.lastSeenAt = Date.now();
+    client.messages += 1;
     if (data.length > MAX_WS_MESSAGE_BYTES) {
       ws.close(1009, 'message too large');
       return;
@@ -115,6 +135,15 @@ async function handleRequest(req, res) {
 
   // ── API ─────────────────────────────────────────────────────────────────
   if (urlPath.startsWith('/api/')) {
+    if (urlPath === '/api/live-rooms') {
+      if (!isAuthorizedRequest(req, process.env.ADMIN_TOKEN || '')) {
+        return json(res, { error: 'unauthorized' }, 401);
+      }
+      return json(res, {
+        serverTime: Date.now(),
+        rooms: buildLiveRoomSnapshot(rooms),
+      });
+    }
     return handleAPI(req, res);
   }
 
