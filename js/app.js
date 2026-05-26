@@ -181,6 +181,10 @@ const DOM = {
   fsSensVal:        $('fs-sens-val'),
   fsLevelFill:      $('fs-level-fill'),
   fsDetectStatus:   $('fs-detect-status'),
+  fsLiveState:      $('fs-live-state'),
+  fsLiveLevel:      $('fs-live-level'),
+  fsLiveFill:       $('fs-live-fill'),
+  fsLiveHint:       $('fs-live-hint'),
   btnFsFlip:        $('btn-fs-flip'),
   btnFsSettings:    $('btn-fs-settings'),
   btnFsSettingsClose:$('btn-fs-settings-close'),
@@ -1088,9 +1092,26 @@ function setupFinishCamera() {
     if (DOM.fsLevelFill) DOM.fsLevelFill.style.width = `${pct}%`;
     if (DOM.fsDetectStatus) DOM.fsDetectStatus.textContent =
       level > 0.3 ? `🔴 检测到动作 (${Math.round(pct)}%)` : `🟢 监听中 (${Math.round(pct)}%)`;
+    updateFinishLiveMonitor(
+      level,
+      level > 0.3 ? '检测到动作' : '等待发令',
+      level > 0.3 ? '终点线已有明显动作，发令后会记录冲线' : '请确认红色终点线压在真实终点位置'
+    );
   });
 
   if (DOM.fsStateLabel) DOM.fsStateLabel.textContent = '摄像头就绪，等待连接...';
+  updateFinishLiveMonitor(0, '等待发令', '摄像头就绪后，发令端开始比赛才会记录成绩');
+}
+
+function updateFinishLiveMonitor(level = 0, stateText = '', hintText = '') {
+  const pct = Math.max(0, Math.min(100, Math.round(level * 100)));
+  if (DOM.fsLiveLevel) DOM.fsLiveLevel.textContent = `${pct}%`;
+  if (DOM.fsLiveFill) {
+    DOM.fsLiveFill.style.width = `${pct}%`;
+    DOM.fsLiveFill.className = pct >= 30 ? 'hot' : pct >= 12 ? 'warm' : '';
+  }
+  if (stateText && DOM.fsLiveState) DOM.fsLiveState.textContent = stateText;
+  if (hintText && DOM.fsLiveHint) DOM.fsLiveHint.textContent = hintText;
 }
 
 // ── Audio monitor ──────────────────────────────────────
@@ -1865,8 +1886,7 @@ function onFinishDeviceRaceStart(event) {
   detector.start(
     (laneIdx, perfTs) => {
       if (performance.now() < fsGraceUntil) return false;
-      handleFinishCrossing(laneIdx, perfTs);
-      return true;
+      return handleFinishCrossing(laneIdx, perfTs);
     },
     (level) => {
       const pct = Math.min(100, level * 100);
@@ -1875,8 +1895,14 @@ function onFinishDeviceRaceStart(event) {
         if (performance.now() < fsGraceUntil) {
           const secLeft = Math.ceil((fsGraceUntil - performance.now()) / 1000);
           DOM.fsDetectStatus.textContent = `📷 保护期 ${secLeft}s — 忽略误触发`;
+          updateFinishLiveMonitor(level, `保护期 ${secLeft}s`, '保护期内动作不计入成绩，结束后立即监听冲线');
         } else {
           DOM.fsDetectStatus.textContent = level > 0.3 ? `🔴 检测到动作 (${Math.round(pct)}%)` : '🟢 等待冲线...';
+          updateFinishLiveMonitor(
+            level,
+            level > 0.3 ? '检测到动作' : '等待冲线',
+            level > 0.3 ? '动作足够明显，穿过红色终点线会自动截图计时' : '若冲线未识别，可点底部道次人工确认'
+          );
         }
       }
     }
@@ -1887,6 +1913,7 @@ function onFinishDeviceRaceStart(event) {
   if (DOM.fsEnd) DOM.fsEnd.classList.add('hidden');
 
   if (DOM.fsStateLabel) DOM.fsStateLabel.textContent = '🏃 比赛进行中';
+  updateFinishLiveMonitor(0, '收到发令', '保护期结束后，运动员穿过红色终点线会自动截图计时');
   if (DOM.fsConnDot) DOM.fsConnDot.classList.add('connected');
   updateLaneStatusBar();   // show lane status bar with all lanes waiting
   showToast('⚡ 收到发令信号，计时开始！', 'success');
@@ -1894,7 +1921,7 @@ function onFinishDeviceRaceStart(event) {
 }
 
 function handleFinishCrossing(laneIdx, perfTs) {
-  if (!state.raceStarted || state.raceFinished) return;
+  if (!state.raceStarted || state.raceFinished) return false;
 
   // Clamp laneIdx to valid range
   if (laneIdx < 0 || laneIdx >= state.laneCount) laneIdx = Math.min(laneIdx, state.laneCount - 1);
@@ -1903,7 +1930,7 @@ function handleFinishCrossing(laneIdx, perfTs) {
   if (state.laneCrossings[laneIdx] === undefined) state.laneCrossings[laneIdx] = 0;
 
   // Lane has already finished all laps
-  if (state.laneCrossings[laneIdx] >= state.lapCount) return;
+  if (state.laneCrossings[laneIdx] >= state.lapCount) return false;
 
   const raceTime    = sync.serverNow() - state.raceStartServerTime;
   const videoOffset = state.recordingStart != null
@@ -1917,7 +1944,7 @@ function handleFinishCrossing(laneIdx, perfTs) {
   // This only catches sensor noise that slipped past the 3-second cooldown.
   // NO upper limit — slow students / walkers are always accepted. ✓
   if (state.lapCount > 1 && state.laneCrossings[laneIdx] > 0) {
-    if (lapTime < 5000) return;  // < 5 s between crossings → impossible, ignore
+    if (lapTime < 5000) return false;  // < 5 s between crossings → impossible, ignore
   }
   state.laneLastCrossingTime[laneIdx] = raceTime;
   state.laneCrossings[laneIdx]++;
@@ -1937,7 +1964,7 @@ function handleFinishCrossing(laneIdx, perfTs) {
     renderSplitCard(laneIdx, crossingNum, raceTime, lapTime, laneName, paceStr);
     sync.send('CROSSING_SPLIT', { laneIdx, raceTime, lapTime, lapNum: crossingNum, athleteName: laneName, paceStr });
     showToast(`${laneName} 第${crossingNum}圈 ${PrecisionTimer.formatFull(raceTime)}${paceStr ? '  ' + paceStr : ''}`, 'info');
-    return;
+    return true;
   }
 
   // Final crossing — capture frame + record finish
@@ -1958,10 +1985,12 @@ function handleFinishCrossing(laneIdx, perfTs) {
 
   sync.send('CROSSING', { laneIdx, raceTime, rank, athleteName: laneName, lapTime, paceStr });
   showToast(`🏁 #${rank} ${laneName}  ${PrecisionTimer.formatFull(raceTime)}`, 'success');
+  updateFinishLiveMonitor(1, `已记录第 ${rank} 名`, `${laneName} ${PrecisionTimer.formatFull(raceTime)}，已截图`);
 
   if (state.lanesDone >= state.laneCount) {
     setTimeout(onFinishDeviceRaceEnd, 1000);
   }
+  return true;
 }
 
 function renderCrossingCard(crossing) {
@@ -2845,6 +2874,13 @@ function updateLaneStatusBar() {
           : (state.raceStarted ? '⏳' : '—')}
       </div>`;
     bar.appendChild(cell);
+    if (!done && state.raceStarted && !state.raceFinished) {
+      cell.title = 'AI 未识别时，点按这里人工确认该道冲线';
+      cell.addEventListener('click', () => {
+        if (!confirm(`人工确认第 ${i + 1} 道已经冲线？`)) return;
+        handleFinishCrossing(i, performance.now());
+      });
+    }
   }
 
   bar.classList.toggle('hidden', !state.raceStarted && !state.raceFinished);

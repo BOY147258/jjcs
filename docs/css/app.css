@@ -1519,6 +1519,56 @@ input[type="text"]:focus { border-color: var(--accent); }
 }
 .fs-gear-btn:active { background: rgba(255,255,255,0.15); }
 
+.fs-live-monitor {
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  z-index: 22;
+  background: rgba(0,0,0,0.68);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 10px;
+  padding: 10px 12px;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.fs-live-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255,255,255,0.95);
+  font-size: 13px;
+  font-weight: 800;
+}
+.fs-live-row strong {
+  color: var(--green);
+  font-family: monospace;
+  font-size: 15px;
+}
+.fs-live-track {
+  margin-top: 8px;
+  height: 7px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.12);
+}
+.fs-live-track div {
+  width: 0;
+  height: 100%;
+  background: var(--green);
+  transition: width .12s linear, background .12s linear;
+}
+.fs-live-track div.warm { background: var(--yellow); }
+.fs-live-track div.hot { background: var(--red); }
+.fs-live-hint {
+  margin-top: 7px;
+  color: rgba(255,255,255,0.72);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 /* Crossing result cards (right side) */
 .fs-results {
   position: absolute;
@@ -1632,6 +1682,7 @@ input[type="text"]:focus { border-color: var(--accent); }
   text-align: center;
   transition: background 0.4s, border-color 0.4s;
   min-width: 0;
+  cursor: pointer;
 }
 .fs-lane-cell.done {
   background: rgba(0,200,100,0.25);
