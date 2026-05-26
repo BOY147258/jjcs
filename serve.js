@@ -69,6 +69,7 @@ wss.on('connection', (ws, req) => {
   const urlObj = new URL(req.url, 'http://x');
   const room   = urlObj.searchParams.get('room');
   const role   = urlObj.searchParams.get('role') || 'unknown';
+  const latencyMs = Number(urlObj.searchParams.get('latencyMs'));
 
   if (!isValidRoomCode(room)) { ws.close(1008, 'valid room required'); return; }
 
@@ -82,6 +83,7 @@ wss.on('connection', (ws, req) => {
     joinedAt,
     lastSeenAt: joinedAt,
     messages: 0,
+    latencyMs: Number.isFinite(latencyMs) && latencyMs >= 0 ? Math.round(latencyMs) : null,
     remoteAddress: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '',
     userAgent: req.headers['user-agent'] || '',
   };

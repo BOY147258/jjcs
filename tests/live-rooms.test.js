@@ -5,7 +5,7 @@ import { buildLiveRoomSnapshot } from '../lib/live-rooms.js';
 test('buildLiveRoomSnapshot summarizes active rooms and roles', () => {
   const rooms = new Map([
     ['4821', [
-      { id: 1, role: 'start', joinedAt: 1000, lastSeenAt: 1800, messages: 3, remoteAddress: '1.1.1.1', userAgent: 'Chrome' },
+      { id: 1, role: 'start', joinedAt: 1000, lastSeenAt: 1800, messages: 3, latencyMs: 18, remoteAddress: '1.1.1.1', userAgent: 'Chrome' },
       { id: 2, role: 'finish', joinedAt: 1200, lastSeenAt: 1900, messages: 8 },
       { id: 3, role: 'observer', joinedAt: 1300, lastSeenAt: 1700 },
     ]],
@@ -22,6 +22,7 @@ test('buildLiveRoomSnapshot summarizes active rooms and roles', () => {
   assert.equal(snapshot[0].clients[0].onlineMs, 1000);
   assert.equal(snapshot[0].clients[1].idleMs, 100);
   assert.equal(snapshot[0].clients[0].remoteAddress, '1.1.1.1');
+  assert.equal(snapshot[0].clients[0].latencyMs, 18);
 });
 
 test('buildLiveRoomSnapshot omits empty rooms', () => {

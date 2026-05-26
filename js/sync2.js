@@ -76,7 +76,12 @@ export class Sync {
 
       const host  = this._serverHost || location.host;
       const proto = (this._serverHost || location.protocol === 'https:') ? 'wss:' : 'ws:';
-      const url   = `${proto}//${host}/ws?room=${encodeURIComponent(this.room)}&role=${encodeURIComponent(this.role)}`;
+      const params = new URLSearchParams({
+        room: this.room,
+        role: this.role,
+      });
+      if (this.rtt !== null && this.rtt !== undefined) params.set('latencyMs', String(this.rtt));
+      const url   = `${proto}//${host}/ws?${params.toString()}`;
       this._ws    = new WebSocket(url);
 
       this._ws.onmessage = e => {

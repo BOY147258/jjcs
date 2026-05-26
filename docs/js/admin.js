@@ -241,6 +241,13 @@ function relativeSeconds(ms) {
   return `${Math.max(0, Math.round((ms || 0) / 1000))} 秒`;
 }
 
+function latencyLabel(ms) {
+  if (ms === null || ms === undefined) return { text: '未校准', className: 'lat-unknown' };
+  if (ms < 30) return { text: `优秀 ${ms}ms`, className: 'lat-good' };
+  if (ms < 80) return { text: `可用 ${ms}ms`, className: 'lat-ok' };
+  return { text: `偏高 ${ms}ms`, className: 'lat-bad' };
+}
+
 function renderLiveRooms(payload) {
   ensureLiveRoomsPanel();
   const list = document.getElementById('live-rooms-list');
@@ -265,15 +272,18 @@ function renderLiveRooms(payload) {
         <span>成绩 ${room.roleCounts.observer || 0}</span>
       </div>
       <div class="live-client-list">
-        ${room.clients.map(client => `
+        ${room.clients.map(client => {
+          const latency = latencyLabel(client.latencyMs);
+          return `
           <div class="live-client">
             <b>${roleLabel(client.role)}</b>
             <span>#${client.id}</span>
+            <span class="live-latency ${latency.className}">${latency.text}</span>
             <span>在线 ${relativeSeconds(client.onlineMs)}</span>
             <span>空闲 ${relativeSeconds(client.idleMs)}</span>
             <span>消息 ${client.messages}</span>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
     </div>
   `).join('');

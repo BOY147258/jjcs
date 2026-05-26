@@ -363,3 +363,24 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   color: var(--text);
   font-size: 13px;
 }
+.live-latency {
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-weight: 700;
+}
+.live-latency.lat-good {
+  color: #00c853;
+  background: rgba(0,200,83,.12);
+}
+.live-latency.lat-ok {
+  color: #faad14;
+  background: rgba(250,173,20,.14);
+}
+.live-latency.lat-bad {
+  color: #ff4d4f;
+  background: rgba(255,77,79,.14);
+}
+.live-latency.lat-unknown {
+  color: var(--muted);
+  background: var(--surface);
+}

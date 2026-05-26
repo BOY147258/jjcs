@@ -2108,7 +2108,11 @@ function updateLatencyBadge() {
   if (!badge) return;
   const rtt = sync.rtt;
   if (rtt === null || rtt === undefined) { badge.textContent = ''; return; }
-  badge.textContent = `${rtt}ms`;
+  const label = rtt < 30 ? '优秀' : rtt < 80 ? '可用' : '偏高';
+  badge.textContent = `${label} ${rtt}ms`;
+  badge.title = rtt < 80
+    ? '当前网络适合多设备同步'
+    : '当前网络延迟偏高，建议切换更稳定网络后再用于正式测试';
   badge.className = 'latency-badge ' + (rtt < 30 ? 'lat-good' : rtt < 80 ? 'lat-ok' : 'lat-bad');
 }
 
