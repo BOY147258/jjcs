@@ -1,11 +1,24 @@
 services:
   - type: web
     name: jjcs
-    env: node
-    plan: free
-    buildCommand: echo "no build needed"
-    startCommand: node serve.js
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /ping
+    disk:
+      name: jjcs-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
-    healthCheckPath: /ping
+      - key: DATA_DIR
+        value: /opt/render/project/src/data
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: MAX_WS_MESSAGE_BYTES
+        value: "65536"

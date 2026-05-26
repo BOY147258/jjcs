@@ -65,6 +65,8 @@ Recommended first production shape:
 
 The `docs/` folder exists for GitHub Pages/static hosting compatibility. The full Node server is the simpler path while the product is still evolving.
 
+For a step-by-step public deployment guide, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ## Public Use Flow
 
 For real schools and phones on different networks, do not rely on `localhost`, LAN IPs, or temporary tunnels. Deploy the Node service to a fixed HTTPS domain that supports WebSocket upgrades.

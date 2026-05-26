@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log
+.git
+.env
+data
+certs
+localtunnel.log
+localtunnel.err.log
