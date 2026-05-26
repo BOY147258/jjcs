@@ -21,7 +21,7 @@ export class FinishLineDetector {
     this.onLevel            = null;  // cb(level 0–1, blobsArray)
     this.onCloseFinish      = null;  // cb(firstLane, secondLane, diffMs) — fired when gap < 300ms
     // Analysis canvas: narrow strip centered on finish line (wider = more robust)
-    this._W = 32;
+    this._W = 64;
     this._H = 90;
     // Lanes permanently locked after first crossing (cleared on race reset)
     this._laneDone     = new Set();
@@ -111,37 +111,80 @@ export class FinishLineDetector {
     return (vw < vh) !== (dw < dh);   // one is portrait, the other landscape
   }
 
-  _analyze() {
-    if (!this._video || this._video.readyState < 2) return;
-    const W = this._W, H = this._H;
+  _videoVisibleRect() {
+    const vw = this._video?.videoWidth || 0;
+    const vh = this._video?.videoHeight || 0;
+    const dw = this._dispCanvas?.offsetWidth || this._dispCanvas?.clientWidth || 0;
+    const dh = this._dispCanvas?.offsetHeight || this._dispCanvas?.clientHeight || 0;
+    if (!vw || !vh || !dw || !dh) return null;
 
-    const vw = this._video.videoWidth  || 640;
-    const vh = this._video.videoHeight || 480;
+    const scale = Math.max(dw / vw, dh / vh);
+    const visibleW = Math.min(vw, dw / scale);
+    const visibleH = Math.min(vh, dh / scale);
+    const offsetX = Math.max(0, (vw - visibleW) / 2);
+    const offsetY = Math.max(0, (vh - visibleH) / 2);
+    return { vw, vh, visibleW, visibleH, offsetX, offsetY };
+  }
 
-    // When the camera delivers portrait pixels but the display is landscape (common on iOS),
-    // the finish-line axis in raw pixels is Y (not X), and the lane axis is X (not Y).
-    const swapped = this._isAxesSwapped();
+  _drawFinishStrip(W, H) {
+    const rect = this._videoVisibleRect();
+    if (!rect) return null;
+
+    const { vw, vh, visibleW, visibleH, offsetX, offsetY } = rect;
+    const swapped = false;
+
+    this._ctx.clearRect(0, 0, W, H);
 
     if (!swapped) {
-      // ── Normal (landscape raw video) ─────────────────
-      // Take a thin vertical strip at the finish-line X position.
-      const srcX = Math.max(0, Math.round(this._linePos * vw) - W / 2);
+      const rawX = offsetX + this._linePos * visibleW;
+      const srcX = Math.max(0, Math.round(rawX - W / 2));
       const srcW = Math.min(W, vw - srcX);
-      this._ctx.drawImage(this._video, srcX, 0, Math.max(1, srcW), vh, 0, 0, W, H);
-    } else {
-      // ── Portrait raw video in landscape display ───────
-      // Finish-line position maps to a Y position in raw pixels.
-      // Lane axis = X axis of raw video → map to analysis canvas Y axis.
-      const srcY = Math.max(0, Math.round(this._linePos * vh) - W / 2);
-      const srcH = Math.min(W, vh - srcY);
-      // Draw the horizontal strip rotated 90° so raw-X becomes canvas-Y.
-      this._ctx.save();
-      this._ctx.translate(W, 0);
-      this._ctx.rotate(Math.PI / 2);
-      // After rotation: canvas X→Y, canvas Y→-X+W
-      // drawImage dest (0,0,H,W) in rotated space fills the W×H analysis canvas.
-      this._ctx.drawImage(this._video, 0, srcY, vw, Math.max(1, srcH), 0, 0, H, W);
-      this._ctx.restore();
+      this._ctx.drawImage(
+        this._video,
+        srcX,
+        offsetY,
+        Math.max(1, srcW),
+        Math.max(1, visibleH),
+        0,
+        0,
+        W,
+        H
+      );
+      return { ...rect, swapped, srcX, srcY: offsetY, srcW, srcH: visibleH };
+    }
+
+    const rawY = offsetY + this._linePos * visibleH;
+    const srcY = Math.max(0, Math.round(rawY - W / 2));
+    const srcH = Math.min(W, vh - srcY);
+    this._ctx.save();
+    this._ctx.translate(W, 0);
+    this._ctx.rotate(Math.PI / 2);
+    this._ctx.drawImage(
+      this._video,
+      offsetX,
+      srcY,
+      Math.max(1, visibleW),
+      Math.max(1, srcH),
+      0,
+      0,
+      H,
+      W
+    );
+    this._ctx.restore();
+    return { ...rect, swapped, srcX: offsetX, srcY, srcW: visibleW, srcH };
+  }
+
+  _analyze() {
+    if (!this._video || this._video.readyState < 2) {
+      this.onLevel?.(0, [], { ready: false });
+      return;
+    }
+    const W = this._W, H = this._H;
+
+    const sampleInfo = this._drawFinishStrip(W, H);
+    if (!sampleInfo) {
+      this.onLevel?.(0, [], { ready: false });
+      return;
     }
 
     const slice = this._ctx.getImageData(0, 0, W, H);
@@ -172,9 +215,9 @@ export class FinishLineDetector {
     const level = Math.min(1, total / (H * this._threshold * 2));
     this._lastMotion = level;
 
-    const blobs = this._detectBlobs(motionPerRow, H);
+    const blobs = this._detectBlobs(motionPerRow, H, level);
     this._lastBlobs = blobs;
-    this.onLevel?.(level, blobs);
+    this.onLevel?.(level, blobs, { ready: true, ...sampleInfo });
 
     blobs.forEach(blob => {
       const laneIdx = this._laneFromY(blob.center);
@@ -194,24 +237,29 @@ export class FinishLineDetector {
       this._lastCrossingTs   = ts;
       this._lastCrossingLane = laneIdx;
       this._cooldowns[laneIdx] = true;
-      // Reset cooldown after cooldownMs — but only if the lane isn't permanently locked
-      // cooldownMs is set higher (3000ms) for multi-lap races to prevent double-counting
+      // Reset cooldown after cooldownMs, but only if the lane isn't permanently locked.
       setTimeout(() => {
         if (!this._laneDone.has(laneIdx)) this._cooldowns[laneIdx] = false;
       }, this.cooldownMs);
     });
   }
 
-  _detectBlobs(motionPerRow, H) {
-    const THRESH  = this._threshold * 0.7;
-    const MIN_PX  = Math.floor(H * 0.08);  // blob must be ≥8% of height
+  _detectBlobs(motionPerRow, H, level = 0) {
+    const THRESH  = this._threshold * 0.45;
+    const MIN_PX  = Math.max(3, Math.floor(H * 0.04));
 
     const blobs = [];
     let start = -1;
     let maxM  = 0;
+    let peakY = 0;
+    let peakMotion = 0;
 
     for (let y = 0; y <= H; y++) {
       const m = y < H ? motionPerRow[y] : 0;
+      if (m > peakMotion) {
+        peakMotion = m;
+        peakY = y;
+      }
       if (m > THRESH && start < 0) { start = y; maxM = m; }
       else if (m > THRESH)         { if (m > maxM) maxM = m; }
       else if (start >= 0) {
@@ -226,6 +274,17 @@ export class FinishLineDetector {
         start = -1; maxM = 0;
       }
     }
+
+    if (!blobs.length && level > 0.18 && peakMotion > this._threshold * 0.35) {
+      const half = Math.max(2, Math.floor(MIN_PX / 2));
+      blobs.push({
+        top: Math.max(0, peakY - half),
+        bottom: Math.min(H, peakY + half + 1),
+        center: peakY,
+        peak: peakMotion,
+      });
+    }
+
     return blobs;
   }
 
