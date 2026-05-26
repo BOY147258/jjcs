@@ -195,6 +195,7 @@ async function init() {
   loadSettings();
   buildLaneInputs();
   ensureSharePanel();
+  applyRoomCodeOnlySharePanel();
   applyRoleCopy();
   attachEventListeners();
   applySettingsToDOM();
@@ -360,6 +361,26 @@ function ensureSharePanel() {
   DOM.roomCodeSetWrap.appendChild(panel);
 }
 
+function applyRoomCodeOnlySharePanel() {
+  const panel = $('share-panel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="share-title">本场房间号</div>
+    <div class="share-room-code" id="share-room-code">----</div>
+    <div class="share-note">终点端、成绩端打开同一个网址，选择角色后输入这个房间号即可。</div>
+    <div class="share-actions">
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-copy-room-code">复制房间号</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-copy-public-link">复制网址</button>
+    </div>
+    <details class="share-advanced">
+      <summary>备用：复制指定角色链接</summary>
+      <div class="share-links">
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-copy-finish-link">复制终点端链接</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-copy-observer-link">复制成绩端链接</button>
+      </div>
+    </details>`;
+}
+
 function renderShareLinks() {
   const panel = $('share-panel');
   if (!panel || selectedRole !== 'start') return;
@@ -370,6 +391,9 @@ function renderShareLinks() {
   const finishUrl = buildJoinUrl('finish', roomCode);
   const observerUrl = buildJoinUrl('observer', roomCode);
   $('share-room-code').textContent = roomCode;
+  panel.dataset.publicUrl = pairingShareOrigin();
+  panel.dataset.finishUrl = finishUrl;
+  panel.dataset.observerUrl = observerUrl;
   const finishLink = $('finish-join-link');
   const observerLink = $('observer-join-link');
   if (finishLink) finishLink.href = finishUrl;
@@ -402,6 +426,15 @@ async function copyJoinLink(role) {
   }
 }
 
+async function copyTextToClipboard(text, successMessage) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(successMessage, 'success');
+  } catch {
+    prompt('复制下面内容', text);
+  }
+}
+
 function applyRoleCopy() {
   document.querySelector('.role-header')?.replaceChildren(document.createTextNode('竞迹'));
   document.querySelector('.role-sub')?.replaceChildren(document.createTextNode('选择设备角色'));
@@ -426,7 +459,7 @@ function applyRoleCopy() {
     })
   );
   document.querySelector('#room-code-input-wrap .room-label')?.replaceChildren(document.createTextNode('房间码'));
-  if (DOM.roomCodeInput) DOM.roomCodeInput.placeholder = '扫码或链接会自动填写';
+  if (DOM.roomCodeInput) DOM.roomCodeInput.placeholder = '输入发令端显示的房间号';
   if (DOM.btnConnect) DOM.btnConnect.textContent = '连接比赛';
   if (DOM.btnRoleConfirm) DOM.btnRoleConfirm.textContent = '进入设备';
   if (DOM.roomStatus) DOM.roomStatus.textContent = '未连接';
@@ -2462,6 +2495,13 @@ function attachEventListeners() {
     renderShareLinks();
   });
   DOM.roomCodeSet?.addEventListener('input', renderShareLinks);
+  $('btn-copy-room-code')?.addEventListener('click', () => {
+    const roomCode = DOM.roomCodeSet?.value.trim() || state.roomCode || '';
+    if (roomCode) copyTextToClipboard(roomCode, '房间号已复制');
+  });
+  $('btn-copy-public-link')?.addEventListener('click', () => {
+    copyTextToClipboard($('share-panel')?.dataset.publicUrl || pairingShareOrigin(), '网址已复制');
+  });
   $('btn-copy-finish-link')?.addEventListener('click', () => copyJoinLink('finish'));
   $('btn-copy-observer-link')?.addEventListener('click', () => copyJoinLink('observer'));
 

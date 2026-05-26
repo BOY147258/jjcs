@@ -73,7 +73,7 @@
 
         <!-- Start device: set own room code -->
         <div id="room-code-set-wrap" class="hidden">
-          <label class="room-label">设置房间码<span class="room-label-hint">（4位，告知所有终点端）</span></label>
+          <label class="room-label">设置房间号<span class="room-label-hint">（所有设备输入同一个房间号）</span></label>
           <div class="room-code-set-row">
             <input type="text" id="room-code-set" class="room-code-input" maxlength="6"
               placeholder="自定义" inputmode="numeric" pattern="[0-9]*">
@@ -81,9 +81,9 @@
           </div>
         </div>
 
-        <!-- Finish device: enter room code -->
+        <!-- Finish / observer device: enter room code -->
         <div id="room-code-input-wrap" class="hidden">
-          <label class="room-label">输入发令端房间码</label>
+          <label class="room-label">输入同一个房间号</label>
           <input type="text" id="room-code-input" class="room-code-input" maxlength="6"
             placeholder="与发令端相同" inputmode="numeric" pattern="[0-9]*">
         </div>

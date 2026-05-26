@@ -1334,6 +1334,25 @@ input[type="text"]:focus { border-color: var(--accent); }
   font-size: 18px;
   letter-spacing: 2px;
 }
+.share-room-code {
+  margin: 4px 0 8px;
+  padding: 12px;
+  text-align: center;
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 8px;
+  color: var(--accent);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.share-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
 .share-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1368,6 +1387,15 @@ input[type="text"]:focus { border-color: var(--accent); }
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 8px;
+}
+.share-advanced {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.share-advanced summary {
+  cursor: pointer;
+  text-align: center;
 }
 .share-links a {
   display: block;
