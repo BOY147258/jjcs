@@ -7,6 +7,7 @@ export class FinishLineDetector {
     this._dispCanvas        = null;
     this._dispCtx           = null;
     this._prevSlice         = null;
+    this._bgSlice           = null;
     this._linePos           = 0.5;
     this._threshold         = 14;   // lower = more sensitive; user can adjust via slider
     this._running           = false;
@@ -17,6 +18,7 @@ export class FinishLineDetector {
     this._lastBlobs         = [];
     this._lastCrossingTs    = -Infinity;  // performance.now() of last crossing
     this._lastCrossingLane  = -1;
+    this._rafId             = null;
     this.onCrossing         = null;  // cb(laneIdx, perfTimestamp)
     this.onLevel            = null;  // cb(level 0–1, blobsArray)
     this.onCloseFinish      = null;  // cb(firstLane, secondLane, diffMs) — fired when gap < 300ms
@@ -77,6 +79,7 @@ export class FinishLineDetector {
     this._resetDividers(laneCount);
 
     this._prevSlice = null;  // reset when re-initing
+    this._bgSlice = null;
 
     this._canvas = document.createElement('canvas');
     this._canvas.width  = this._W;
@@ -85,19 +88,26 @@ export class FinishLineDetector {
   }
 
   start(onCrossing, onLevel) {
+    this.stop();
     this.onCrossing = onCrossing;
     this.onLevel    = onLevel;
     this._running   = true;
     this._loop();
   }
 
-  stop() { this._running = false; }
+  stop() {
+    this._running = false;
+    if (this._rafId !== null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(this._rafId);
+    }
+    this._rafId = null;
+  }
 
   _loop() {
     if (!this._running) return;
     this._analyze();
     this._drawOverlay();
-    requestAnimationFrame(() => this._loop());
+    this._rafId = requestAnimationFrame(() => this._loop());
   }
 
   // Returns true when the raw video pixels are rotated 90° relative to the display.
@@ -192,20 +202,32 @@ export class FinishLineDetector {
     if (!this._prevSlice) {
       this._prevSlice = new Uint8Array(slice.data.length);
       this._prevSlice.set(slice.data);
+      this._bgSlice = new Uint8Array(slice.data.length);
+      this._bgSlice.set(slice.data);
       return;
     }
+    if (!this._bgSlice || this._bgSlice.length !== slice.data.length) {
+      this._bgSlice = new Uint8Array(slice.data.length);
+      this._bgSlice.set(slice.data);
+    }
 
-    // Motion per pixel row across the narrow strip
+    // Motion/occupancy per pixel row across the narrow strip.
+    // Previous-frame diff catches fast sprint motion; background diff catches slower
+    // hand/body crossings that stay on the line for several frames.
     const motionPerRow = new Float32Array(H);
     for (let y = 0; y < H; y++) {
-      let rowDiff = 0;
+      let prevDiff = 0;
+      let bgDiff = 0;
       for (let x = 0; x < W; x++) {
         const i = (y * W + x) * 4;
-        rowDiff += Math.abs(slice.data[i]   - this._prevSlice[i]);
-        rowDiff += Math.abs(slice.data[i+1] - this._prevSlice[i+1]);
-        rowDiff += Math.abs(slice.data[i+2] - this._prevSlice[i+2]);
+        prevDiff += Math.abs(slice.data[i]   - this._prevSlice[i]);
+        prevDiff += Math.abs(slice.data[i+1] - this._prevSlice[i+1]);
+        prevDiff += Math.abs(slice.data[i+2] - this._prevSlice[i+2]);
+        bgDiff += Math.abs(slice.data[i]   - this._bgSlice[i]);
+        bgDiff += Math.abs(slice.data[i+1] - this._bgSlice[i+1]);
+        bgDiff += Math.abs(slice.data[i+2] - this._bgSlice[i+2]);
       }
-      motionPerRow[y] = rowDiff / (W * 3);
+      motionPerRow[y] = Math.max(prevDiff, bgDiff * 0.7) / (W * 3);
     }
 
     this._prevSlice.set(slice.data);
@@ -218,6 +240,11 @@ export class FinishLineDetector {
     const blobs = this._detectBlobs(motionPerRow, H, level);
     this._lastBlobs = blobs;
     this.onLevel?.(level, blobs, { ready: true, ...sampleInfo });
+    if (!blobs.length && level < 0.08) {
+      for (let i = 0; i < slice.data.length; i++) {
+        this._bgSlice[i] = Math.round(this._bgSlice[i] * 0.96 + slice.data[i] * 0.04);
+      }
+    }
 
     blobs.forEach(blob => {
       const laneIdx = this._laneFromY(blob.center);
@@ -303,6 +330,7 @@ export class FinishLineDetector {
         this._dispCanvas.width  = needW;
         this._dispCanvas.height = needH;
         this._prevSlice = null;   // reset motion diff after resize
+        this._bgSlice = null;
       }
     } else {
       return;  // canvas not laid out yet (hidden parent)

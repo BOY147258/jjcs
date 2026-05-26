@@ -1520,6 +1520,7 @@ input[type="text"]:focus { border-color: var(--accent); }
 .fs-gear-btn:active { background: rgba(255,255,255,0.15); }
 
 .fs-live-monitor {
+  display: none;
   position: absolute;
   left: max(12px, env(safe-area-inset-left, 0px));
   right: max(12px, env(safe-area-inset-right, 0px));
