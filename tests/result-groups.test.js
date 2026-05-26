@@ -71,6 +71,18 @@ test('sorts groups by newest recorded result first', () => {
   assert.deepEqual(groups.map(g => g.raceName), ['Second', 'First']);
 });
 
+test('uses readable fallback names for orphan result groups', () => {
+  const groups = buildResultGroups({
+    meets: [],
+    events: [],
+    results: [
+      { id: 1, eventId: 99, round: 1, group: 1, athleteName: 'A', recordedAt: 1000 },
+    ],
+  });
+
+  assert.equal(groups[0].raceName, '未命名比赛');
+});
+
 test('parses result group ids for server-side deletion', () => {
   assert.deepEqual(parseResultGroupId('10-2-3'), { eventId: 10, round: 2, group: 3 });
   assert.equal(parseResultGroupId('bad-value'), null);

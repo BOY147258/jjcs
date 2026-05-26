@@ -11,6 +11,7 @@
   display: none;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
   background: #12121e;
   border-bottom: 1px solid #2a2a44;
   padding: 12px 16px;
@@ -35,8 +36,28 @@
   font-weight: 700;
   color: #f0f2f5;
 }
+.mobile-admin-nav {
+  display: none;
+  width: 100%;
+  gap: 6px;
+  background: #12121e;
+  border-bottom: 1px solid #2a2a44;
+  padding: 8px 16px 12px;
+  position: sticky;
+  top: 49px;
+  z-index: 190;
+}
+.mobile-admin-nav .nav-link {
+  flex: 1;
+  text-align: center;
+  padding: 8px 6px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.06);
+}
 @media (max-width: 768px) {
+  body { display: block; }
   .topbar-back { display: flex; }
+  .mobile-admin-nav { display: flex; }
   .sidebar { display: none; }
   .content { margin-left: 0 !important; padding: 16px !important; }
 }
@@ -77,6 +98,12 @@
 <div class="topbar-back">
   <a href="index.html">← 返回计时端</a>
   <span class="tb-title">📊 成绩管理</span>
+</div>
+
+<div class="mobile-admin-nav">
+  <a href="#" data-page="overview" class="nav-link">概览</a>
+  <a href="#" data-page="results" class="nav-link active">成绩</a>
+  <a href="#" data-page="export" class="nav-link">导出</a>
 </div>
 
 <nav class="sidebar">

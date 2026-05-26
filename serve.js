@@ -10,6 +10,7 @@ import { buildLiveRoomSnapshot } from './lib/live-rooms.js';
 import {
   applyCorsHeaders,
   isAuthorizedRequest,
+  isValidDeviceRole,
   isSafeStaticPath,
   isValidRoomCode,
   normalizeAllowedOrigins,
@@ -72,6 +73,7 @@ wss.on('connection', (ws, req) => {
   const latencyMs = Number(urlObj.searchParams.get('latencyMs'));
 
   if (!isValidRoomCode(room)) { ws.close(1008, 'valid room required'); return; }
+  if (!isValidDeviceRole(role)) { ws.close(1008, 'valid role required'); return; }
 
   const id = _nextId++;
   const joinedAt = Date.now();
@@ -178,6 +180,7 @@ async function handleRequest(req, res) {
 
   fs.readFile(filePath, (readErr, data) => {
     if (readErr) {
+      if (ext) { res.writeHead(404); res.end('Not found'); return; }
       fs.readFile(path.join(DIR, 'index.html'), (e2, d2) => {
         if (e2) { res.writeHead(404); res.end('Not found'); return; }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });

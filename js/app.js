@@ -361,7 +361,7 @@ function renderShareLinks() {
 
 function qrImageUrl(value) {
   const data = encodeURIComponent(value);
-  return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${data}`;
+  return `/api/qr?data=${data}`;
 }
 
 function hideShareLinks() {

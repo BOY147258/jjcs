@@ -21,8 +21,9 @@ test('buildLiveRoomSnapshot summarizes active rooms and roles', () => {
   assert.equal(snapshot[0].roleCounts.observer, 1);
   assert.equal(snapshot[0].clients[0].onlineMs, 1000);
   assert.equal(snapshot[0].clients[1].idleMs, 100);
-  assert.equal(snapshot[0].clients[0].remoteAddress, '1.1.1.1');
   assert.equal(snapshot[0].clients[0].latencyMs, 18);
+  assert.equal('remoteAddress' in snapshot[0].clients[0], false);
+  assert.equal('userAgent' in snapshot[0].clients[0], false);
 });
 
 test('buildLiveRoomSnapshot omits empty rooms', () => {

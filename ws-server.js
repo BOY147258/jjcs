@@ -4,6 +4,7 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import {
   applyCorsHeaders,
+  isValidDeviceRole,
   isValidRoomCode,
   normalizeAllowedOrigins,
   parsePositiveInt,
@@ -34,6 +35,7 @@ wss.on('connection', (ws, req) => {
   const room = url.searchParams.get('room');
   const role = url.searchParams.get('role') || 'unknown';
   if (!isValidRoomCode(room)) { ws.close(1008, 'valid room required'); return; }
+  if (!isValidDeviceRole(role)) { ws.close(1008, 'valid role required'); return; }
 
   const id = _nextId++;
   if (!rooms.has(room)) rooms.set(room, []);

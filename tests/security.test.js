@@ -6,6 +6,7 @@ import {
   isAuthorizedRequest,
   isOriginAllowed,
   isSafeStaticPath,
+  isValidDeviceRole,
   isValidRoomCode,
   normalizeAllowedOrigins,
 } from '../lib/security.js';
@@ -43,6 +44,15 @@ test('validates room codes used for device pairing', () => {
   assert.equal(isValidRoomCode(''), false);
   assert.equal(isValidRoomCode('../secret'), false);
   assert.equal(isValidRoomCode('x'.repeat(33)), false);
+});
+
+test('validates known device roles', () => {
+  assert.equal(isValidDeviceRole('start'), true);
+  assert.equal(isValidDeviceRole('finish'), true);
+  assert.equal(isValidDeviceRole('observer'), true);
+  assert.equal(isValidDeviceRole('solo'), true);
+  assert.equal(isValidDeviceRole('timer'), false);
+  assert.equal(isValidDeviceRole(''), false);
 });
 
 test('permits writes when no admin token is configured', () => {

@@ -1,4 +1,5 @@
 import { readDB, writeDB, insertRecord, updateRecord, deleteRecord, findById } from './db.js';
+import QRCode from 'qrcode';
 import { BACKUP_COLLECTIONS, buildBackupPayload } from './lib/backup.js';
 import { buildResultGroups, parseResultGroupId } from './lib/result-groups.js';
 import { isAuthorizedRequest, isMutatingMethod } from './lib/security.js';
@@ -13,8 +14,23 @@ function err(res, msg, status = 400) { json(res, { error: msg }, status); }
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', chunk => { body += chunk; if (body.length > 1e6) reject(new Error('too large')); });
-    req.on('end', () => { try { resolve(JSON.parse(body || '{}')); } catch { resolve({}); } });
+    let rejected = false;
+    req.on('data', chunk => {
+      if (rejected) return;
+      body += chunk;
+      if (body.length > 1e6) {
+        rejected = true;
+        reject(Object.assign(new Error('payload too large'), { statusCode: 413 }));
+        req.destroy();
+      }
+    });
+    req.on('aborted', () => {
+      if (!rejected) reject(Object.assign(new Error('request aborted'), { statusCode: 400 }));
+    });
+    req.on('end', () => {
+      if (rejected) return;
+      try { resolve(JSON.parse(body || '{}')); } catch { resolve({}); }
+    });
     req.on('error', reject);
   });
 }
@@ -51,6 +67,22 @@ export async function handleAPI(req, res) {
   // DELETE /api/meets/:id
 
   try {
+    if (parts[0] === 'qr' && method === 'GET') {
+      const data = url.searchParams.get('data') || '';
+      if (!data || data.length > 2048) return err(res, 'invalid qr data');
+      const svg = await QRCode.toString(data, {
+        type: 'svg',
+        margin: 1,
+        width: 180,
+        errorCorrectionLevel: 'M',
+      });
+      res.writeHead(200, {
+        'Content-Type': 'image/svg+xml; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      return res.end(svg);
+    }
+
     // ── meets ──────────────────────────────────────────────────────────────
     if (parts[0] === 'meets') {
       if (method === 'GET' && !parts[1]) {
@@ -368,6 +400,6 @@ export async function handleAPI(req, res) {
     err(res, 'not found', 404);
   } catch (e) {
     console.error('[API]', e);
-    err(res, 'internal error', 500);
+    err(res, e.message === 'payload too large' ? 'payload too large' : 'internal error', e.statusCode || 500);
   }
 }
