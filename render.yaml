@@ -2,20 +2,14 @@ services:
   - type: web
     name: jjcs
     runtime: node
-    plan: starter
+    plan: free
     region: singapore
     buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /ping
-    disk:
-      name: jjcs-data
-      mountPath: /opt/render/project/src/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATA_DIR
-        value: /opt/render/project/src/data
       - key: ADMIN_TOKEN
         sync: false
       - key: ALLOWED_ORIGINS

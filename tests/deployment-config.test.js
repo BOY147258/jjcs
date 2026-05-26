@@ -2,13 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-test('render blueprint is configured for persistent public deployment', () => {
+test('render blueprint is configured for public pilot deployment', () => {
   const renderYaml = fs.readFileSync('render.yaml', 'utf8');
 
   assert.match(renderYaml, /runtime:\s*node/);
+  assert.match(renderYaml, /plan:\s*free/);
   assert.match(renderYaml, /healthCheckPath:\s*\/ping/);
-  assert.match(renderYaml, /mountPath:\s*\/opt\/render\/project\/src\/data/);
-  assert.match(renderYaml, /key:\s*DATA_DIR/);
   assert.match(renderYaml, /key:\s*ADMIN_TOKEN/);
 });
 

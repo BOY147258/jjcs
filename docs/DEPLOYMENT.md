@@ -26,13 +26,16 @@ https://render.com/deploy?repo=https://github.com/BOY147258/jjcs
 3. Use the included `render.yaml`.
 4. Set `ADMIN_TOKEN` to a strong private value when Render asks for secret environment variables.
 5. Leave `ALLOWED_ORIGINS` empty for same-origin app/API usage, or set it to the final domain, for example `https://jjcs.example.com`.
-6. Confirm the persistent disk:
-   - name: `jjcs-data`
-   - mount path: `/opt/render/project/src/data`
-   - size: `1 GB` to start
-7. Deploy.
-8. Open `/ping` on the Render URL and confirm it returns JSON.
-9. Open `/admin`, save the admin token, and check the online-room panel.
+6. Deploy.
+7. Open `/ping` on the Render URL and confirm it returns JSON.
+8. Open `/admin`, save the admin token, and check the online-room panel.
+
+The default Blueprint uses Render's free plan so a pilot can be created without payment information. Free services can spin down when idle and their filesystem is not durable. Before real events, upgrade the service plan and add a persistent disk:
+
+- name: `jjcs-data`
+- mount path: `/opt/render/project/src/data`
+- size: `1 GB` to start
+- environment variable: `DATA_DIR=/opt/render/project/src/data`
 
 The service is configured for Singapore by default because most expected early use is in China-adjacent time zones. Change `region` in `render.yaml` if your users are closer to another region.
 
