@@ -6,6 +6,7 @@ import { FinishLineDetector }     from './finishline.js';
 import { ApiClient }              from './api-client.js';
 
 const MAX_LANES = 8;
+const PUBLIC_APP_ORIGIN = 'https://jjcs.onrender.com';
 
 // ── Global state ───────────────────────────────────────
 const state = {
@@ -300,8 +301,29 @@ function readLaunchParams() {
   return { role: validRole, room: cleanRoom };
 }
 
+function isLocalOrigin() {
+  return ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+}
+
+function normalizeHostFromOrigin(origin) {
+  try { return new URL(origin).host; } catch { return ''; }
+}
+
+function pairingServerHost() {
+  const manualHost = $('server-url-input')?.value.trim();
+  if (manualHost) return manualHost.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (isLocalOrigin()) return normalizeHostFromOrigin(PUBLIC_APP_ORIGIN);
+  return null;
+}
+
+function pairingShareOrigin() {
+  const manualHost = $('server-url-input')?.value.trim();
+  if (manualHost) return `https://${manualHost.replace(/^https?:\/\//, '').replace(/\/.*$/, '')}`;
+  return isLocalOrigin() ? PUBLIC_APP_ORIGIN : location.origin;
+}
+
 function buildJoinUrl(role, roomCode = state.roomCode) {
-  const url = new URL(location.href);
+  const url = new URL(pairingShareOrigin());
   url.hash = '';
   url.search = '';
   url.searchParams.set('role', role);
@@ -409,7 +431,12 @@ function applyRoleCopy() {
   if (DOM.btnRoleConfirm) DOM.btnRoleConfirm.textContent = '进入设备';
   if (DOM.roomStatus) DOM.roomStatus.textContent = '未连接';
   const serverInput = $('server-url-input');
-  if (serverInput) serverInput.value = '';
+  if (serverInput) {
+    serverInput.value = '';
+    serverInput.placeholder = isLocalOrigin()
+      ? `本地调试默认走公网：${normalizeHostFromOrigin(PUBLIC_APP_ORIGIN)}`
+      : '留空即可，只有自建服务器时填写';
+  }
   document.querySelector('.server-url-summary')?.replaceChildren(document.createTextNode('高级：服务器地址'));
 }
 
@@ -489,7 +516,7 @@ async function connectToRoom() {
     state.roomCode = code;
   }
 
-  const serverHost = ($('server-url-input')?.value.trim()) || null;
+  const serverHost = pairingServerHost();
 
   try {
     await sync.join(state.roomCode, selectedRole, serverHost);
@@ -544,7 +571,7 @@ async function connectToRoomZeroConfig(options = {}) {
     state.roomCode = code;
   }
 
-  const serverHost = ($('server-url-input')?.value.trim()) || null;
+  const serverHost = pairingServerHost();
 
   try {
     await sync.join(state.roomCode, selectedRole, serverHost);
@@ -758,6 +785,13 @@ function registerSyncEvents() {
     state.raceStartServerTime = e._serverTime;
     if (state.role === 'finish') onFinishDeviceRaceStart(e);
     if (state.role === 'start')  { /* start device sent this, timer already running */ }
+  });
+  sync.on('RACE_START_ACK', e => {
+    if (state.role !== 'start') return;
+    showToast(`终点端已收到发令：${e.ready ? '摄像头就绪' : '等待摄像头'}`, e.ready ? 'success' : 'warn');
+    if (DOM.roomStatus) DOM.roomStatus.textContent = e.ready
+      ? `已发令，终点端正在监听冲线`
+      : `已发令，但终点端摄像头未就绪`;
   });
   sync.on('CROSSING_SPLIT', e => {
     if (state.role === 'start') onStartDeviceReceiveSplit(e);
@@ -1498,8 +1532,9 @@ function beginRace() {
     DOM.timerSub.textContent = '📷 保护期 ' + Math.ceil(graceMs / 1000) + 's...';
     detector.start(
       (laneIdx) => {
-        if (performance.now() < graceUntil) return; // ignore motion during warmup / race-start false trigger
+        if (performance.now() < graceUntil) return false; // ignore motion during warmup / race-start false trigger
         if (laneIdx < state.laneCount) finishLane(laneIdx);
+        return true;
       },
       (level) => {
         if (performance.now() < graceUntil) {
@@ -1517,13 +1552,19 @@ function beginRace() {
 
   // Broadcast race config + start signal to finish device
   if (state.role === 'start') {
-    sync.send('RACE_CONFIG', {
+    const configSent = sync.send('RACE_CONFIG', {
       lapsNeeded:  state.lapCount,
       distance:    state.distance,
       trackLength: state.trackLength,
       roster:      state.lanes.map(l => ({ id: l.id, name: l.name })),
     });
-    sync.send('RACE_START', { serverTime: state.raceStartServerTime });
+    const startSent = sync.send('RACE_START', { serverTime: state.raceStartServerTime });
+    if (!startSent || sync.finishPeerCount < 1) {
+      showToast('未检测到在线终点端，本次只在发令端计时', 'warn');
+      if (DOM.roomStatus) DOM.roomStatus.textContent = '未检测到在线终点端，请确认终点端使用同一个公网链接/房间';
+    } else if (configSent) {
+      showToast('发令已发送，等待终点端确认', 'info');
+    }
   }
 }
 
@@ -1749,6 +1790,12 @@ function onFinishDeviceRaceStart(event) {
   state.laneCrossings = {};
   state.laneLastCrossingTime = {};
   state.lanesDone = 0;
+  sync.send('RACE_START_ACK', {
+    ready: Boolean(state.camGranted && DOM.finishVideoFs?.srcObject),
+    laneCount: state.laneCount,
+    distance: state.distance,
+    lapsNeeded: state.lapCount,
+  });
   detector.resetLaneDone();          // clear per-lane locks from previous race
   updateLaneStatusBar();             // reset status bar to all-waiting
 
@@ -1784,8 +1831,9 @@ function onFinishDeviceRaceStart(event) {
   detector.cooldownMs = state.lapCount > 1 ? 3000 : 1500;
   detector.start(
     (laneIdx, perfTs) => {
-      if (performance.now() < fsGraceUntil) return;
+      if (performance.now() < fsGraceUntil) return false;
       handleFinishCrossing(laneIdx, perfTs);
+      return true;
     },
     (level) => {
       const pct = Math.min(100, level * 100);

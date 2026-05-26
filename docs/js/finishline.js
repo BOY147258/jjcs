@@ -188,11 +188,12 @@ export class FinishLineDetector {
         this.onCloseFinish?.(this._lastCrossingLane, laneIdx, Math.round(diffMs));
       }
 
+      const accepted = this.onCrossing?.(laneIdx, ts) !== false;
+      if (!accepted) return;
+
       this._lastCrossingTs   = ts;
       this._lastCrossingLane = laneIdx;
-
       this._cooldowns[laneIdx] = true;
-      this.onCrossing?.(laneIdx, ts);
       // Reset cooldown after cooldownMs — but only if the lane isn't permanently locked
       // cooldownMs is set higher (3000ms) for multi-lap races to prevent double-counting
       setTimeout(() => {

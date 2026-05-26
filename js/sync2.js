@@ -158,9 +158,10 @@ export class Sync {
 
   // Send event to all peers in room via WebSocket
   send(type, data = {}) {
-    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return false;
     const event = { type, ...data, _serverTime: this.serverNow(), _role: this.role };
     this._ws.send(JSON.stringify(event));
+    return true;
   }
 
   on(type, cb) {
