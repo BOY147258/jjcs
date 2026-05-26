@@ -802,6 +802,7 @@ function registerSyncEvents() {
     if (!state.raceStarted && DOM.finishVideoFs?.srcObject) {
       detector.stop();
       detector.init(DOM.finishVideoFs, DOM.finishCanvasFs, state.laneCount);
+      detector.threshold = 10;
       detector.bindDrag(DOM.finishCanvasFs);
       detector.start(null, level => {
         const pct = Math.min(100, level * 100);
@@ -1064,6 +1065,7 @@ function setupFinishCamera() {
   }
 
   detector.init(DOM.finishVideoFs, DOM.finishCanvasFs, state.laneCount);
+  detector.threshold = 10;
   detector.bindDrag(DOM.finishCanvasFs);
 
   // ── Auto-detect lanes when the first video frame is ready ──────────────
@@ -1871,6 +1873,7 @@ function onFinishDeviceRaceStart(event) {
   // Re-start detector with full crossing callbacks (same video/canvas, already inited)
   detector.stop();
   detector.init(DOM.finishVideoFs, DOM.finishCanvasFs, state.laneCount);
+  detector.threshold = 10;
   detector.bindDrag(DOM.finishCanvasFs);
   detector.onCloseFinish = null;
   // Grace period:
@@ -2096,6 +2099,7 @@ function resetFinishDevice() {
   // Resume preview detection
   detector.stop();
   detector.init(DOM.finishVideoFs, DOM.finishCanvasFs, state.laneCount);
+  detector.threshold = 10;
   detector.bindDrag(DOM.finishCanvasFs);
   detector.start(null, (level) => {
     const pct = Math.min(100, level * 100);
@@ -2564,7 +2568,7 @@ function attachEventListeners() {
   // Finish sensitivity slider
   DOM.fsSensSlider?.addEventListener('input', () => {
     const v = +DOM.fsSensSlider.value;
-    detector.threshold = 100 - v;
+    detector.threshold = Math.max(5, 85 - v);
     if (DOM.fsSensVal) DOM.fsSensVal.textContent = v;
   });
 

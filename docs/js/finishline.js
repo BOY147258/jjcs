@@ -302,7 +302,7 @@ export class FinishLineDetector {
       }
     }
 
-    if (!blobs.length && level > 0.18 && peakMotion > this._threshold * 0.35) {
+    if (!blobs.length && level > 0.10 && peakMotion > this._threshold * 0.25) {
       const half = Math.max(2, Math.floor(MIN_PX / 2));
       blobs.push({
         top: Math.max(0, peakY - half),
